@@ -7,18 +7,27 @@ deleting, and renaming profile blocks in `~/.untaped/config.yml`.
 
 ## Install
 
-Install it into the same uv tool environment as `untaped`:
-
-```bash
-untaped plugins add "untaped-profile @ git+https://github.com/alexisbeaulieu97/untaped-profile.git"
-```
-
-Or rebuild the tool environment directly:
+Install both `untaped` and this plugin from git:
 
 ```bash
 uv tool install "git+https://github.com/alexisbeaulieu97/untaped.git" \
   --with "untaped-profile @ git+https://github.com/alexisbeaulieu97/untaped-profile.git" \
   --force
+```
+
+To let `untaped plugins` remember that desired plugin state, record the
+plugin without syncing, then rebuild the tool from the same source spec:
+
+```bash
+untaped plugins add "untaped-profile @ git+https://github.com/alexisbeaulieu97/untaped-profile.git" --no-sync
+untaped plugins sync --tool-spec "git+https://github.com/alexisbeaulieu97/untaped.git"
+```
+
+For local editable development, point sync at the local `untaped` checkout:
+
+```bash
+untaped plugins add "untaped-profile @ git+https://github.com/alexisbeaulieu97/untaped-profile.git" --no-sync
+untaped plugins sync --tool-spec /path/to/untaped --editable-tool
 ```
 
 ## Commands

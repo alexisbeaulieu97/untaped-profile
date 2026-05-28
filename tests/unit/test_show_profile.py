@@ -7,9 +7,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from untaped_profile.application import ShowProfile
-
 from untaped import ConfigError
+
+from untaped_profile.application import ShowProfile
 
 
 def test_default_returns_resolved_dict_with_fallback(repo: Any) -> None:

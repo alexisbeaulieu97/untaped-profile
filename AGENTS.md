@@ -1,181 +1,148 @@
 # AGENTS.md — `untaped-profile`
 
-Plugin that owns the **profile inventory** in
-`~/.untaped/config.yml` — which profiles exist, which is active, how
-to create / use / show / delete / rename them. Built-in `untaped config`
-operates on the keys *inside* whichever profile is targeted; this
-package operates on the top-level `profiles.<…>` blocks and the
-`active:` pointer themselves.
+Single source of truth for this standalone plugin repo. If you change
+architecture, command behavior, settings behavior, or the development
+workflow, update this file in the same commit.
 
-## Inventory surface
+## Mission
 
-Commands map one-to-one onto use cases in `application/`: `list`,
-`show`, `use`, `current`, `create`, `delete`, `rename`. Each use case
-talks to a single concrete adapter (`ProfileFileRepository` in
-`infrastructure/profile_repo.py`) via the `ProfileRepository`
-Protocol declared in `application/ports.py`. The adapter delegates
-every read and write to the profile-aware helpers in
-`untaped.config_file` and `untaped.profile_resolver` — this
-package does not parse or write YAML directly.
+`untaped-profile` is an `untaped` plugin. It owns the **profile inventory**
+in `~/.untaped/config.yml`: which profiles exist, which profile is active,
+and how profiles are created, shown, selected, deleted, and renamed.
+`untaped` core owns the binary, plugin discovery, config/profile resolution,
+output helpers, and config-file primitives.
 
-## Active vs persisted-active
+## Hard Rules
 
-`ProfileFileRepository` exposes **two** ways to read the active
-profile name. They look near-identical and pick different sources on
-purpose:
+1. **Keep `AGENTS.md` up to date.** Architecture changes and new command
+   patterns must be documented here.
+2. **Prefer `uv` commands over manual dependency edits.** Use `uv add` and
+   `uv add --group dev`; hand-edit tool config only.
+3. **Expose the plugin through the `untaped.plugins` entry point.**
+   `profile = "untaped_profile.plugin:plugin"` is the public integration
+   point.
+4. **Use the 4-layer DDD layout.** `cli -> application -> domain`, with
+   `infrastructure -> domain`; `application` and `infrastructure` must not
+   import each other at runtime.
+5. **Declare ports in `application/ports.py`.** Use cases depend on the
+   narrowest `Protocol`; concrete adapters satisfy ports structurally.
+6. **Use absolute imports.** `from untaped_profile...` and `from untaped...`,
+   never relative imports.
+7. **Every source module has a module docstring.** Re-export `__init__.py`
+   files are exempt.
+8. **Every Typer app and every command with required args sets
+   `no_args_is_help=True`.**
+9. **stdout is data only.** Prompts, progress, and status messages go to
+   stderr via `typer.echo(..., err=True)`.
+10. **Pipe-friendly commands keep stable raw identifiers.** For `profile
+    list`, `_profile_row()` must keep `name` as the first key.
+11. **Secrets stay secret.** Redaction uses `secret_field_paths` from the
+    installed `untaped` settings registry; never print known secret values
+    unless the user passes `--show-secrets`.
+12. **Finish with verification.** Run `uv run ruff check --fix`, `uv run ruff
+    format`, `uv run mypy`, and `uv run pytest`.
 
-- `active_name()` returns the *effective* active profile, honouring
+## Architecture
+
+```
+src/untaped_profile/
+├── __init__.py           # re-exports app
+├── plugin.py             # entry-point plugin object
+├── cli/                  # Typer commands; composition root
+├── application/          # use cases and ports
+├── domain/               # pure models
+└── infrastructure/       # config-file adapter
+```
+
+Commands map one-to-one onto use cases in `application/`: `list`, `show`,
+`use`, `current`, `create`, `delete`, and `rename`. Each use case talks to
+`ProfileFileRepository` through the narrowest port in `application/ports.py`.
+The adapter delegates every read and write to `untaped.config_file` and
+`untaped.profile_resolver`; this package does not parse or write YAML itself.
+
+## Active vs Persisted Active
+
+`ProfileFileRepository` exposes two active-profile accessors:
+
+- `active_name()` returns the effective active profile, honoring
   `UNTAPED_PROFILE` and the root `untaped --profile <name>` flag.
-  Read-side concerns use this so the world stays consistent during a
-  per-call override — e.g. the ✓ marker in `untaped profile list`
-  reflects whichever profile the current process is actually using.
-- `persisted_active_name()` returns *only* the `active:` key on disk,
-  ignoring per-call overrides.
+- `persisted_active_name()` returns only the `active:` key on disk, ignoring
+  per-call overrides.
 
-The invariant: **a transient `--profile` flag must never rewrite the
-user's persisted active pointer behind their back.** Today,
-`DeleteProfile` is the only use case that *consults*
-`persisted_active_name()` directly (to refuse deletion of the
-persisted active) — otherwise running
-`untaped --profile staging profile delete staging` while `production`
-was the persisted active would refuse the delete based on a transient
-override, which is hostile. `RenameProfile` doesn't consult either
-accessor; it delegates `active:` consistency to
-`untaped.config_file.rename_profile` (which updates the pointer
-in the same `mutate_config` op when the renamed profile was active).
-Future mutating use cases that *consult* the active pointer should
-use `persisted_active_name()`.
+A transient `--profile` flag must never rewrite the user's persisted active
+pointer. Mutating use cases that consult the active pointer must compare
+against `persisted_active_name()`. `RenameProfile` delegates active-pointer
+consistency to `untaped.config_file.rename_profile`, which updates `active:`
+in the same locked mutation when the renamed profile was persisted active.
 
-For the env/active/default/schema layering itself, see
-`src/untaped/profile_resolver.py` and `src/untaped/settings.py`.
+## `current` Contract
 
-## `current` and the source contract
+`untaped profile current` returns `(name, source)`, where source is
+`env`, `config`, or `fallback`. The name goes to stdout; `(source: ...)`
+goes to stderr.
 
-`untaped profile current` returns more than a name: it returns
-`(name, source)` where `source ∈ env / config / fallback`. The bare
-name goes to stdout; `(source: …)` goes to stderr. Pipe-friendly by
-construction.
+When source is `env` or `config`, the use case validates that the named
+profile exists. This protects the pipe pattern:
 
-The use case (`application/current_profile.py`) **validates** when
-`source ∈ env / config`: the named profile must actually exist on
-disk, otherwise it raises `ConfigError` listing the known profiles.
-This protects the documented pipe pattern
-`untaped --profile $(untaped profile current)` — without validation,
-a typo in `UNTAPED_PROFILE` or `active:` would silently propagate
-into a downstream `--profile` that other commands then reject with a
-worse error, far from the source.
+```bash
+untaped --profile "$(untaped profile current)" ...
+```
 
-`fallback` (no env, no `active:`, or `active:` with no matching
-profile) reports the conceptual `default` placeholder regardless of
-whether `profiles.default` exists on disk — schema defaults are in
-effect either way, and there's no user typo to protect against.
+Fallback reports the conceptual `default` profile even if
+`profiles.default` is absent, because schema defaults are then in effect.
 
-The root `--profile <name>` flag flows through `UNTAPED_PROFILE`, so a
-per-call override is reported as `source=env` — `current` doesn't need
-a separate flag-detection path.
+## Mutation Invariants
 
-## Mutation invariants
-
-Rules spread across the mutating use cases. A new mutating use case
-should honour the same set:
-
-- `RenameProfile` rejects empty new names, rejects renaming
-  `default`, and rejects `default` as the rename target (it's the
-  implicit floor; renaming it would break the fallback layer). When
-  the renamed profile is the *persisted* active one, `active:` is
-  updated in the same `mutate_config` op via
-  `untaped.config_file.rename_profile` — so the pointer never
-  points at a missing profile mid-rename.
-- `DeleteProfile` refuses to delete the persisted active profile
-  (would orphan `active:`). `default` is **not** special-cased — when
-  it's not active, deleting `default` just clears any shared
-  overrides and values fall through to schema defaults.
-- `CreateProfile` rejects empty names and already-existing names
-  (returning the known-profiles list in the error). Deep-copies on
-  `--copy-from` so later edits to the source profile don't bleed
-  into the new one.
+- `CreateProfile` rejects empty names and collisions, and deep-copies
+  `--copy-from` data.
+- `DeleteProfile` refuses to delete the persisted active profile. `default`
+  is not special-cased when another profile is active.
+- `RenameProfile` rejects empty new names, rejects renaming `default`, rejects
+  `default` as a target, and preserves the persisted active pointer.
 
 ## Redaction
 
-`untaped profile show` redacts secrets at the **CLI layer**
-(`cli/commands.py`) using
-`redact_secrets(profile.data, secret_field_paths(get_profile_settings_model()))`
-from `untaped` — the dict-walking variant. Both `--format yaml` and
-`--format json` redact; `--show-secrets` reveals. Note that
-`profile.data` here is the **resolved view by default** (default ⤥
-named) and only the verbatim block under `--raw` — `ShowProfile`
-overloads `Profile.data` based on the `--raw` flag in
-`show_profile.py`, so the `Profile` model's docstring ("verbatim
-block, no fallback merge") is true for `ListProfiles` but not for
-the default (`--raw=False`) path of `show`. For the row-rendering
-cousin used by `untaped config list`, see `src/untaped/config/`.
+`profile show` redacts secrets in the CLI layer with:
 
-## Layering
+```python
+redact_secrets(profile.data, secret_field_paths(get_profile_settings_model()))
+```
 
-Standard 4-layer DDD per root AGENTS.md "Architecture: 4-Layer DDD".
-Three package-specific notes:
+Both YAML and JSON output redact by default. `--show-secrets` is the only
+path that reveals raw values. Redaction depends on settings sections
+registered by installed plugins, so tests that assert AWX/GitHub token
+redaction register small secret-bearing schemas explicitly.
 
-- **Reader / writer-axis split.** `application/ports.py` declares four
-  Protocols layered by two axes — read vs. write, and "writes profile
-  data" vs. "writes the active-profile pointer":
-  - `ProfileReader` — six read-side methods used by `ListProfiles` /
-    `ShowProfile` / `CurrentProfile`.
-  - `ProfileWriter(ProfileReader, Protocol)` — adds `write` / `delete`
-    / `rename` for `CreateProfile` / `DeleteProfile` / `RenameProfile`.
-  - `ActiveProfileWriter(ProfileReader, Protocol)` — adds `set_active`
-    for `UseProfile`. Parallel sibling to `ProfileWriter` because
-    `UseProfile`'s actual surface is `set_active` only; a linear
-    `ProfileReader ⊂ ProfileWriter ⊂ ProfileRepository` chain would
-    over-grant `write` / `delete` / `rename` to it.
-  - `ProfileRepository(ProfileWriter, ActiveProfileWriter, Protocol)` —
-    the widest variant; concrete adapters satisfy it structurally.
-  Pick the narrowest Protocol at each use case's constructor —
-  read-only use cases can't accidentally grow a mutation call past
-  mypy, and writer-axis writers can't accidentally rewrite the
-  active-profile pointer.
-- **One concrete adapter.** `ProfileFileRepository` is a thin pass
-  through to `untaped.config_file` (`read_profile`,
-  `write_profile`, `delete_profile`, `rename_profile`,
-  `set_active_profile`, …) and `untaped.profile_resolver`
-  (`classify_active_profile`, `effective_active_profile_name`,
-  `resolve_profiles`). New profile-level operations belong as new
-  helpers in core's `config_file` module, with this adapter
-  delegating.
-- **Per-command Format restrictions are inline.** `show` narrows
-  `FormatOption` to `Literal["yaml", "json"]` because a single
-  nested object has no rows for `raw`/`table` to render. New
-  commands that only emit one shape should narrow the same way
-  rather than accept a Format value they can't honour.
+## Development Workflow
 
-## Recipe: add a new profile sub-command
+```bash
+uv sync
+uv run pre-commit install
+uv run pytest
+uv run mypy
+uv run ruff check --fix
+uv run ruff format
+uv run untaped profile --help
+```
 
-Generic Typer wiring (no_args_is_help, `--format`/`--columns`,
-stderr-only side-effect logging, stub-driven use case tests) follows
-the root AGENTS.md "Recipe: Add a new command to an existing plugin".
-Package-specific notes:
+Use `pytest --no-cov` for tight local loops. Full `pytest` enforces the
+coverage gate.
 
-1. If the command needs an external operation the repo doesn't already
-   expose, add the method to the matching Protocol in
-   `application/ports.py` (read-only → `ProfileReader`; data writes →
-   `ProfileWriter`; `active:` pointer → `ActiveProfileWriter`) *and*
-   to `ProfileFileRepository`. Constructor-inject via the narrowest
-   port the use case actually needs.
-2. For mutating use cases that touch `active:`, compare against
-   `persisted_active_name()`, never `active_name()` — see "Active vs
-   persisted-active" above.
-3. If the command emits a single nested object, narrow `FormatOption`
-   to a `Literal[...]` of the formats that actually make sense (see
-   `show` for the pattern).
-4. If the command writes, also test through `ProfileFileRepository`
-   against a real temp `config.yml` so the `mutate_config` path in
-   core's helpers is exercised end-to-end.
+## Recipe: Add a Profile Sub-command
 
-## See also
+1. Write a use-case test with `FakeProfileRepository`.
+2. Add or narrow a port in `application/ports.py` if the command needs new
+   repository behavior.
+3. Implement the use case in `application/`.
+4. Wire the Typer command in `cli/commands.py`; keep stdout data-only.
+5. If the command writes, add a `ProfileFileRepository` test against a temp
+   `config.yml`.
+6. Run `uv run untaped profile <command> --help` plus the full verification
+   commands above.
 
-- [Root AGENTS.md](../../AGENTS.md) — 4-Layer DDD, Hard Rules,
-  cross-cutting helpers index.
-- `src/untaped/profile_resolver.py` and `src/untaped/settings.py` —
-  profile resolution internals and the settings registry.
-- `src/untaped/config/` — built-in `untaped config` implementation.
-- [`docs/configuration.md`](../../docs/configuration.md) — user-facing
-  configuration, profiles, secrets, env-var overrides.
+## See Also
+
+- [`untaped` core](https://github.com/alexisbeaulieu97/untaped) — plugin
+  runtime, settings registry, config-file helpers, output helpers.
+- [`untaped` configuration docs](https://github.com/alexisbeaulieu97/untaped/blob/main/docs/configuration.md)
+  — user-facing profile and config behavior.

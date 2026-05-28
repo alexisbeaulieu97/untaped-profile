@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from untaped_profile.application import CreateProfile
-
 from untaped import ConfigError
+
+from untaped_profile.application import CreateProfile
 
 
 def test_creates_empty_profile_when_no_source(repo: Any) -> None:

@@ -7,7 +7,6 @@ from typing import Literal
 
 import typer
 import yaml
-
 from untaped import (
     ColumnsOption,
     FormatOption,
@@ -18,6 +17,7 @@ from untaped import (
     resolve_config_path,
     secret_field_paths,
 )
+
 from untaped_profile.application import (
     CreateProfile,
     CurrentProfile,

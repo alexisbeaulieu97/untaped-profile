@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from untaped_profile.application import UseProfile
-
 from untaped import ConfigError
+
+from untaped_profile.application import UseProfile
 
 
 def test_persists_active(repo: Any) -> None:

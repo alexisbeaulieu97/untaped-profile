@@ -7,9 +7,37 @@ need — the use cases never know about YAML, files, or the resolver.
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import pytest
+from pydantic import BaseModel, SecretStr
+from untaped import (
+    get_settings,
+    register_profile_settings,
+)
+from untaped.settings import reset_config_registry_for_tests
+
+
+class _AwxTestSettings(BaseModel):
+    base_url: str | None = None
+    token: SecretStr | None = None
+
+
+class _GithubTestSettings(BaseModel):
+    token: SecretStr | None = None
+
+
+@pytest.fixture(autouse=True)
+def _register_secret_settings_for_redaction_tests() -> Iterator[None]:
+    """Register small plugin schemas so profile-show redaction is testable."""
+    reset_config_registry_for_tests()
+    register_profile_settings("awx", _AwxTestSettings)
+    register_profile_settings("github", _GithubTestSettings)
+    get_settings.cache_clear()
+    yield
+    reset_config_registry_for_tests()
+    get_settings.cache_clear()
 
 
 class FakeProfileRepository:
@@ -105,7 +133,10 @@ def repo() -> FakeProfileRepository:
 
 
 @pytest.fixture
-def empty_repo_factory():  # type: ignore[no-untyped-def]
+def empty_repo_factory() -> Callable[
+    [dict[str, dict[str, Any]] | None, str | None, str | None],
+    FakeProfileRepository,
+]:
     """Return a callable that builds a fresh ``FakeProfileRepository`` with
     custom seed data — used by tests that need a different fixture shape."""
 

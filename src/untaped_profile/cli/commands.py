@@ -59,9 +59,11 @@ def list_command(
         typer.echo(format_output(rows, fmt=fmt, columns=columns))
 
 
-@app.command("show", no_args_is_help=True)
+@app.command("show")
 def show_command(
-    name: str = typer.Argument(..., help="Profile name to inspect."),
+    name: str | None = typer.Argument(
+        None, help="Profile name to inspect; defaults to the current profile."
+    ),
     raw: bool = typer.Option(
         False,
         "--raw",
@@ -91,7 +93,19 @@ def show_command(
     unless ``--show-secrets`` is passed, mirroring ``untaped config list``.
     """
     with report_errors():
-        profile = ShowProfile(ProfileFileRepository())(name, raw=raw)
+        repo = ProfileFileRepository()
+        if name is None:
+            current = CurrentProfile(repo)()
+            target = current.name
+            allow_conceptual_default = current.source == "fallback"
+        else:
+            target = name
+            allow_conceptual_default = False
+        profile = ShowProfile(repo)(
+            target,
+            raw=raw,
+            allow_conceptual_default=allow_conceptual_default,
+        )
         header = f"# profile: {profile.name}"
         if profile.is_active:
             header += " (active)"

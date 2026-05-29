@@ -37,6 +37,7 @@ untaped plugins add git+https://github.com/alexisbeaulieu97/untaped-profile.git 
 ```text
 untaped profile list
 untaped profile current
+untaped profile show
 untaped profile show <name>
 untaped profile show <name> --raw
 untaped profile show <name> --show-secrets
@@ -49,6 +50,9 @@ untaped profile rename <old> <new>
 
 `profile current` writes only the profile name to stdout so it can be used
 in shell prompts and scripts. Source metadata goes to stderr.
+
+`profile show` without a name inspects the current effective profile. Pass a
+name only when inspecting a different profile.
 
 ## Development
 

@@ -136,6 +136,16 @@ def test_show_without_name_falls_back_to_default_with_no_config(
     assert "# profile: default (active)" in result.stderr
 
 
+def test_show_explicit_default_still_requires_default_profile(
+    _isolate_config: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("UNTAPED_PROFILE", raising=False)
+    assert not _isolate_config.exists()
+    result = CliRunner().invoke(app, ["show", "default"])
+    assert result.exit_code != 0
+    assert "default" in result.output or "default" in result.stderr
+
+
 def test_show_raw_returns_only_what_profile_sets(_isolate_config: Path) -> None:
     _seed(_isolate_config)
     result = CliRunner().invoke(app, ["show", "prod", "--raw"])
@@ -148,6 +158,13 @@ def test_show_unknown_profile_errors(_isolate_config: Path) -> None:
     _seed(_isolate_config)
     result = CliRunner().invoke(app, ["show", "ghost"])
     assert result.exit_code != 0
+
+
+def test_show_empty_name_does_not_fallback_to_current(_isolate_config: Path) -> None:
+    _seed(_isolate_config)
+    result = CliRunner().invoke(app, ["show", ""])
+    assert result.exit_code != 0
+    assert "does not exist" in result.output or "does not exist" in result.stderr
 
 
 def test_show_json_emits_structured_envelope(_isolate_config: Path) -> None:

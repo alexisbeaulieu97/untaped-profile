@@ -19,9 +19,15 @@ class ShowProfile:
     def __init__(self, repo: ProfileReader) -> None:
         self._repo = repo
 
-    def __call__(self, name: str, *, raw: bool = False) -> Profile:
+    def __call__(
+        self,
+        name: str,
+        *,
+        raw: bool = False,
+        allow_conceptual_default: bool = False,
+    ) -> Profile:
         raw_data = self._repo.read(name)
-        if raw_data is None and name == DEFAULT_PROFILE:
+        if raw_data is None and name == DEFAULT_PROFILE and allow_conceptual_default:
             data = {} if raw else self._repo.resolved(name)
             active = self._repo.active_name() or DEFAULT_PROFILE
             return Profile(name=name, data=data, is_active=(name == active))

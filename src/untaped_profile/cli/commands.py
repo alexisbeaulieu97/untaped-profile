@@ -94,8 +94,18 @@ def show_command(
     """
     with report_errors():
         repo = ProfileFileRepository()
-        target = name or CurrentProfile(repo)().name
-        profile = ShowProfile(repo)(target, raw=raw)
+        if name is None:
+            current = CurrentProfile(repo)()
+            target = current.name
+            allow_conceptual_default = current.source == "fallback"
+        else:
+            target = name
+            allow_conceptual_default = False
+        profile = ShowProfile(repo)(
+            target,
+            raw=raw,
+            allow_conceptual_default=allow_conceptual_default,
+        )
         header = f"# profile: {profile.name}"
         if profile.is_active:
             header += " (active)"

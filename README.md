@@ -36,8 +36,11 @@ untaped plugins add git+https://github.com/alexisbeaulieu97/untaped-profile.git 
 
 ```text
 untaped profile list
+untaped profile list --profile work
 untaped profile current
+untaped profile current --profile work
 untaped profile show
+untaped profile show --profile work
 untaped profile show <name>
 untaped profile show <name> --raw
 untaped profile show <name> --show-secrets
@@ -47,6 +50,11 @@ untaped profile create <name> --copy-from default
 untaped profile delete <name>
 untaped profile rename <old> <new>
 ```
+
+`profile list`, `profile current`, and `profile show` accept command-local
+`--profile <name>` when you want to inspect a profile other than the
+persisted active profile. Mutation commands keep their explicit name
+arguments and do not use command-local profile selection.
 
 `profile current` writes only the profile name to stdout so it can be used
 in shell prompts and scripts. Source metadata goes to stderr.

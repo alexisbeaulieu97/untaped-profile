@@ -10,8 +10,10 @@ import yaml
 from untaped import (
     ColumnsOption,
     FormatOption,
+    ProfileOverrideOption,
     format_output,
     get_profile_settings_model,
+    profile_override,
     redact_secrets,
     report_errors,
     resolve_config_path,
@@ -51,9 +53,10 @@ def _callback() -> None:
 def list_command(
     fmt: FormatOption = "table",
     columns: ColumnsOption = None,
+    profile: ProfileOverrideOption = None,
 ) -> None:
     """List every profile, marking which one is active."""
-    with report_errors():
+    with report_errors(), profile_override(profile):
         profiles = ListProfiles(ProfileFileRepository())()
         rows: list[dict[str, object]] = [_profile_row(p) for p in profiles]
         typer.echo(format_output(rows, fmt=fmt, columns=columns))
@@ -80,6 +83,7 @@ def show_command(
         "-f",
         help="Output format (yaml or json).",
     ),
+    profile: ProfileOverrideOption = None,
 ) -> None:
     """Print a profile's contents (effective view by default).
 
@@ -92,7 +96,7 @@ def show_command(
     Secrets (AWX/GitHub tokens) are masked as ``***`` in both formats
     unless ``--show-secrets`` is passed, mirroring ``untaped config list``.
     """
-    with report_errors():
+    with report_errors(), profile_override(profile):
         repo = ProfileFileRepository()
         if name is None:
             current = CurrentProfile(repo)()
@@ -101,26 +105,28 @@ def show_command(
         else:
             target = name
             allow_conceptual_default = False
-        profile = ShowProfile(repo)(
+        target_profile = ShowProfile(repo)(
             target,
             raw=raw,
             allow_conceptual_default=allow_conceptual_default,
         )
-        header = f"# profile: {profile.name}"
-        if profile.is_active:
+        header = f"# profile: {target_profile.name}"
+        if target_profile.is_active:
             header += " (active)"
         if not raw:
             header += " — effective view (default ⤥ named)"
         typer.echo(header, err=True)
         data = (
-            profile.data
+            target_profile.data
             if show_secrets
-            else redact_secrets(profile.data, secret_field_paths(get_profile_settings_model()))
+            else redact_secrets(
+                target_profile.data, secret_field_paths(get_profile_settings_model())
+            )
         )
         if fmt == "json":
             envelope = {
-                "name": profile.name,
-                "active": profile.is_active,
+                "name": target_profile.name,
+                "active": target_profile.is_active,
                 "raw": raw,
                 "data": data,
             }
@@ -140,15 +146,18 @@ def use_command(
 
 
 @app.command("current")
-def current_command() -> None:
+def current_command(
+    profile: ProfileOverrideOption = None,
+) -> None:
     """Print the effective active profile name to stdout (pipe-friendly).
 
-    Honours ``UNTAPED_PROFILE`` and the root ``--profile`` flag, falling
-    back to ``default`` when neither is set. The source of the answer
-    (``env`` / ``config`` / ``fallback``) goes to stderr so stdout stays
-    a single bare profile name suitable for piping.
+    Honours ``UNTAPED_PROFILE``, the root ``--profile`` flag, and this
+    command's local ``--profile`` flag, falling back to ``default`` when
+    none is set. The source of the answer (``env`` / ``config`` /
+    ``fallback``) goes to stderr so stdout stays a single bare profile
+    name suitable for piping.
     """
-    with report_errors():
+    with report_errors(), profile_override(profile):
         result = CurrentProfile(ProfileFileRepository())()
         typer.echo(result.name)
         typer.echo(f"(source: {result.source})", err=True)

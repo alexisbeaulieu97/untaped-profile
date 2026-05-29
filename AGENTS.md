@@ -65,21 +65,28 @@ The adapter delegates every read and write to `untaped.config_file` and
 `ProfileFileRepository` exposes two active-profile accessors:
 
 - `active_name()` returns the effective active profile, honoring
-  `UNTAPED_PROFILE` and the root `untaped --profile <name>` flag.
+  `UNTAPED_PROFILE`, the root `untaped --profile <name>` flag, and
+  command-local read overrides such as
+  `untaped profile show --profile <name>`.
 - `persisted_active_name()` returns only the `active:` key on disk, ignoring
   per-call overrides.
 
-A transient `--profile` flag must never rewrite the user's persisted active
-pointer. Mutating use cases that consult the active pointer must compare
-against `persisted_active_name()`. `RenameProfile` delegates active-pointer
-consistency to `untaped.config_file.rename_profile`, which updates `active:`
-in the same locked mutation when the renamed profile was persisted active.
+The `list`, `show`, and `current` commands expose the core command-local
+`ProfileOverrideOption` as `--profile` and wrap their reads in
+`profile_override(profile)`. Mutating commands do not expose a command-local
+profile selector. A transient profile override must never rewrite the user's
+persisted active pointer. Mutating use cases that consult the active pointer
+must compare against `persisted_active_name()`. `RenameProfile` delegates
+active-pointer consistency to `untaped.config_file.rename_profile`, which
+updates `active:` in the same locked mutation when the renamed profile was
+persisted active.
 
 ## `current` Contract
 
-`untaped profile current` returns `(name, source)`, where source is
-`env`, `config`, or `fallback`. The name goes to stdout; `(source: ...)`
-goes to stderr.
+`untaped profile current` returns `(name, source)`, where source is `env`,
+`config`, or `fallback`. A command-local `--profile <name>` is implemented
+through the same temporary env override as the root flag, so it reports
+`env`. The name goes to stdout; `(source: ...)` goes to stderr.
 
 When source is `env` or `config`, the use case validates that the named
 profile exists. This protects the pipe pattern:

@@ -21,6 +21,10 @@ class ShowProfile:
 
     def __call__(self, name: str, *, raw: bool = False) -> Profile:
         raw_data = self._repo.read(name)
+        if raw_data is None and name == DEFAULT_PROFILE:
+            data = {} if raw else self._repo.resolved(name)
+            active = self._repo.active_name() or DEFAULT_PROFILE
+            return Profile(name=name, data=data, is_active=(name == active))
         if raw_data is None:
             known = ", ".join(sorted(self._repo.names())) or "(none)"
             raise ConfigError(f"profile {name!r} does not exist. Known: {known}")

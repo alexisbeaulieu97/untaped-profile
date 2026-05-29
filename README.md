@@ -48,6 +48,7 @@ untaped profile use <name>
 untaped profile create <name>
 untaped profile create <name> --copy-from default
 untaped profile delete <name>
+untaped profile delete <name> --yes
 untaped profile rename <old> <new>
 ```
 
@@ -61,6 +62,9 @@ in shell prompts and scripts. Source metadata goes to stderr.
 
 `profile show` without a name inspects the current effective profile. Pass a
 name only when inspecting a different profile.
+
+`profile delete` asks for confirmation in an interactive terminal and refuses
+non-interactive deletes unless `--yes` is passed.
 
 ## Development
 

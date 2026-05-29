@@ -390,7 +390,7 @@ def test_create_on_empty_config_does_not_materialise_default(_isolate_config: Pa
 
 def test_delete_removes_profile(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["delete", "stage"])
+    result = CliRunner().invoke(app, ["delete", "stage", "--yes"])
     assert result.exit_code == 0, result.output
     assert "stage" not in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
@@ -399,7 +399,7 @@ def test_delete_default_when_not_active(_isolate_config: Path) -> None:
     """`default` is now an optional profile — deleting it when another
     profile is active just clears the shared-overrides layer."""
     _seed(_isolate_config)  # active: prod
-    result = CliRunner().invoke(app, ["delete", "default"])
+    result = CliRunner().invoke(app, ["delete", "default", "--yes"])
     assert result.exit_code == 0, result.output
     data = yaml.safe_load(_isolate_config.read_text())
     assert "default" not in data["profiles"]
@@ -418,6 +418,91 @@ def test_delete_active_refused(_isolate_config: Path) -> None:
     _seed(_isolate_config)
     result = CliRunner().invoke(app, ["delete", "prod"])
     assert result.exit_code != 0
+
+
+def test_delete_active_refused_before_prompt(
+    _isolate_config: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(_isolate_config)
+    prompted = False
+
+    def _confirm_delete(*args: object, **kwargs: object) -> None:
+        nonlocal prompted
+        prompted = True
+
+    monkeypatch.setattr("untaped_profile.cli.commands._confirm_delete", _confirm_delete)
+
+    result = CliRunner().invoke(app, ["delete", "prod"])
+
+    assert result.exit_code != 0
+    assert "active profile" in result.output
+    assert prompted is False
+
+
+def test_delete_requires_yes_when_non_interactive(_isolate_config: Path) -> None:
+    _seed(_isolate_config)
+
+    result = CliRunner().invoke(app, ["delete", "stage"])
+
+    assert result.exit_code != 0
+    assert "--yes" in result.output
+    assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
+
+
+def test_delete_prompts_and_removes_when_confirmed(
+    _isolate_config: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(_isolate_config)
+    monkeypatch.setattr("untaped_profile.cli.commands._stdin_is_interactive", lambda: True)
+
+    result = CliRunner().invoke(app, ["delete", "stage"], input="y\n")
+
+    assert result.exit_code == 0, result.output
+    assert "Delete profile 'stage'" in result.output
+    assert "stage" not in yaml.safe_load(_isolate_config.read_text())["profiles"]
+
+
+def test_delete_decline_keeps_profile(
+    _isolate_config: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(_isolate_config)
+    monkeypatch.setattr("untaped_profile.cli.commands._stdin_is_interactive", lambda: True)
+
+    result = CliRunner().invoke(app, ["delete", "stage"], input="n\n")
+
+    assert result.exit_code != 0
+    assert "delete cancelled" in result.output
+    assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
+
+
+def test_delete_prompt_summary_does_not_print_secret_values(
+    _isolate_config: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate_config.write_text(
+        "profiles:\n  prod: {}\n  stage:\n    github:\n      token: secret-value\nactive: prod\n"
+    )
+    monkeypatch.setattr("untaped_profile.cli.commands._stdin_is_interactive", lambda: True)
+
+    result = CliRunner().invoke(app, ["delete", "stage"], input="n\n")
+
+    assert result.exit_code != 0
+    assert "top-level keys: github" in result.output
+    assert "secret-value" not in result.output
+    assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
+
+
+def test_delete_yes_does_not_prompt(_isolate_config: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _seed(_isolate_config)
+
+    def _confirm_delete(*args: object, **kwargs: object) -> None:
+        raise AssertionError("should not prompt with --yes")
+
+    monkeypatch.setattr("untaped_profile.cli.commands._confirm_delete", _confirm_delete)
+
+    result = CliRunner().invoke(app, ["delete", "stage", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "stage" not in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
 
 # ---- rename ----

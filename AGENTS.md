@@ -102,8 +102,9 @@ Fallback reports the conceptual `default` profile even if
 
 - `CreateProfile` rejects empty names and collisions, and deep-copies
   `--copy-from` data.
-- `DeleteProfile` refuses to delete the persisted active profile. `default`
-  is not special-cased when another profile is active.
+- `DeleteProfile` refuses to delete the persisted active profile. The CLI
+  previews the target and requires interactive confirmation or `--yes` before
+  deleting. `default` is not special-cased when another profile is active.
 - `RenameProfile` rejects empty new names, rejects renaming `default`, rejects
   `default` as a target, and preserves the persisted active pointer.
 

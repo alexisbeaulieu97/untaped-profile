@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import Literal
 
 import typer
 import yaml
 from untaped import (
     ColumnsOption,
+    ConfigError,
     FormatOption,
     ProfileOverrideOption,
     format_output,
@@ -29,7 +31,7 @@ from untaped_profile.application import (
     ShowProfile,
     UseProfile,
 )
-from untaped_profile.domain.models import Profile
+from untaped_profile.domain.models import Profile, ProfileDeletePreview
 from untaped_profile.infrastructure import ProfileFileRepository
 
 # `profile show` returns a single nested object — `raw`/`table` (which want
@@ -182,11 +184,44 @@ def create_command(
 @app.command("delete", no_args_is_help=True)
 def delete_command(
     name: str = typer.Argument(..., help="Profile to remove."),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Delete without interactive confirmation.",
+    ),
 ) -> None:
     """Delete a profile. Refuses to delete the active profile."""
     with report_errors():
-        DeleteProfile(ProfileFileRepository())(name)
+        repo = ProfileFileRepository()
+        delete_profile = DeleteProfile(repo)
+        preview = delete_profile.preview(name)
+        if not yes:
+            _confirm_delete(preview)
+        delete_profile(name)
         typer.echo(f"deleted profile: {name}", err=True)
+
+
+def _confirm_delete(preview: ProfileDeletePreview) -> None:
+    if not _stdin_is_interactive():
+        raise ConfigError("profile delete requires --yes when stdin is not interactive")
+
+    top_level = ", ".join(preview.top_level_keys) or "(none)"
+    typer.echo(f"config: {resolve_config_path()}", err=True)
+    typer.echo(f"profile: {preview.name}", err=True)
+    typer.echo(f"top-level keys: {top_level}", err=True)
+    confirmed = typer.confirm(
+        f"Delete profile {preview.name!r}?",
+        default=False,
+        err=True,
+    )
+    if not confirmed:
+        typer.echo("delete cancelled", err=True)
+        raise typer.Exit(code=1)
+
+
+def _stdin_is_interactive() -> bool:
+    return sys.stdin.isatty()
 
 
 @app.command("rename", no_args_is_help=True)

@@ -24,6 +24,14 @@ class Profile:
         return _count_leaves(self.data)
 
 
+@dataclass(frozen=True)
+class ProfileDeletePreview:
+    """Non-secret summary shown before confirming profile deletion."""
+
+    name: str
+    top_level_keys: tuple[str, ...]
+
+
 def _count_leaves(data: dict[str, Any]) -> int:
     total = 0
     for value in data.values():

@@ -71,6 +71,51 @@ def test_list_marks_active_profile(_isolate_config: Path) -> None:
     assert rows["default"] == ""
 
 
+def test_list_table_honours_global_ui_collection_view(_isolate_config: Path) -> None:
+    _isolate_config.write_text(
+        "ui:\n"
+        "  collection_view: list\n"
+        "profiles:\n"
+        "  default:\n"
+        "    log_level: INFO\n"
+        "  prod:\n"
+        "    awx:\n"
+        "      base_url: https://prod\n"
+        "active: prod\n"
+    )
+    get_settings.cache_clear()
+
+    result = CliRunner().invoke(app, ["list", "--format", "table"])
+
+    assert result.exit_code == 0, result.output
+    assert "name: default" in result.stdout
+    assert "name: prod" in result.stdout
+    assert "active: ✓" in result.stdout
+    for border in ("╭", "╮", "╰", "╯", "┌", "┐", "└", "┘", "│", "─", "|"):
+        assert border not in result.stdout
+
+
+def test_list_raw_ignores_unknown_global_ui_theme(_isolate_config: Path) -> None:
+    _isolate_config.write_text(
+        "ui:\n"
+        "  theme: missing\n"
+        "profiles:\n"
+        "  default:\n"
+        "    log_level: INFO\n"
+        "  prod:\n"
+        "    awx:\n"
+        "      base_url: https://prod\n"
+        "active: prod\n"
+    )
+    get_settings.cache_clear()
+
+    result = CliRunner().invoke(app, ["list", "--format", "raw", "--columns", "name"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines() == ["default", "prod"]
+    assert "\x1b[" not in result.output
+
+
 # ---- show ----
 
 

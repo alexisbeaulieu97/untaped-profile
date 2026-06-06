@@ -12,14 +12,16 @@ from untaped import (
     ColumnsOption,
     ConfigError,
     FormatOption,
+    OutputFormat,
     ProfileOverrideOption,
-    format_output,
+    UiContext,
     get_profile_settings_model,
     profile_override,
     redact_secrets,
     report_errors,
     resolve_config_path,
     secret_field_paths,
+    ui_context,
 )
 
 from untaped_profile.application import (
@@ -61,7 +63,7 @@ def list_command(
     with report_errors(), profile_override(profile):
         profiles = ListProfiles(ProfileFileRepository())()
         rows: list[dict[str, object]] = [_profile_row(p) for p in profiles]
-        typer.echo(format_output(rows, fmt=fmt, columns=columns))
+        typer.echo(_render_collection(rows, fmt=fmt, columns=columns))
 
 
 @app.command("show")
@@ -245,3 +247,14 @@ def _profile_row(p: Profile) -> dict[str, object]:
         "active": "✓" if p.is_active else "",
         "keys": p.key_count,
     }
+
+
+def _render_collection(
+    rows: list[dict[str, object]],
+    *,
+    fmt: OutputFormat,
+    columns: list[str] | None,
+) -> str:
+    if fmt == "table":
+        return ui_context().collection(rows, fmt=fmt, columns=columns)
+    return UiContext().collection(rows, fmt=fmt, columns=columns)

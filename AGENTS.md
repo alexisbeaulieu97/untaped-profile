@@ -101,6 +101,18 @@ untaped --profile "$(untaped profile current)" ...
 Fallback reports the conceptual `default` profile even if
 `profiles.default` is absent, because schema defaults are then in effect.
 
+## List Rendering
+
+`profile list --format table` is human terminal output and honors global
+`ui:` settings, including configured theme presets and `ui.collection_view`.
+The structured formats (`json`, `yaml`, and `raw`) intentionally bypass
+global UI settings and render through a plain `UiContext`, so invalid or
+missing themes never break pipe-friendly output.
+
+The `raw` default-column contract remains load-bearing: `_profile_row()` must
+keep `name` as its first key because scripts depend on
+`untaped profile list --format raw` emitting profile names by default.
+
 ## Mutation Invariants
 
 - `CreateProfile` rejects empty names and collisions, and deep-copies

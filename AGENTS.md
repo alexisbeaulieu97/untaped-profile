@@ -20,7 +20,8 @@ output helpers, and config-file primitives.
    `uv add --group dev`; hand-edit tool config only.
 3. **Expose the plugin through the `untaped.plugins` entry point.**
    `profile = "untaped_profile.plugin:plugin"` is the public integration
-   point.
+   point. The plugin object must expose `id = "profile"`, literal
+   `untaped_api_version = 1`, and `register(registry)`.
 4. **Use the 4-layer DDD layout.** `cli -> application -> domain`, with
    `infrastructure -> domain`; `application` and `infrastructure` must not
    import each other at runtime.
@@ -59,6 +60,8 @@ Commands map one-to-one onto use cases in `application/`: `list`, `show`,
 `ProfileFileRepository` through the narrowest port in `application/ports.py`.
 The adapter delegates every read and write to `untaped.config_file` and
 `untaped.profile_resolver`; this package does not parse or write YAML itself.
+The plugin object also registers the packaged `untaped-profile` agent skill;
+keep that static skill asset current with major profile workflow changes.
 
 ## Active vs Persisted Active
 

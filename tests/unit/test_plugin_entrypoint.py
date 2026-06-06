@@ -12,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 from untaped import get_settings
 from untaped.main import build_app
+from untaped.plugins import PluginRegistry
 
 from untaped_profile.plugin import plugin as profile_plugin
 
@@ -37,6 +38,10 @@ def test_profile_plugin_entry_point_is_declared() -> None:
     assert matches
 
 
+def test_profile_plugin_declares_untaped_api_version() -> None:
+    assert profile_plugin.untaped_api_version == 1
+
+
 def test_root_app_can_register_profile_plugin() -> None:
     app = build_app(plugins=[profile_plugin])
 
@@ -44,6 +49,16 @@ def test_root_app_can_register_profile_plugin() -> None:
 
     assert result.exit_code == 0, result.output
     assert "Manage configuration profiles" in result.output
+
+
+def test_profile_plugin_registers_agent_skill() -> None:
+    registry = PluginRegistry()
+
+    profile_plugin.register(registry)
+
+    spec = registry.skills["untaped-profile"]
+    assert spec.description == "Use the untaped profile plugin."
+    assert spec.source.joinpath("SKILL.md").is_file()
 
 
 def test_root_profile_flag_flows_into_profile_current(_isolate_config: Path) -> None:

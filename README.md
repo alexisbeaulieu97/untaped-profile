@@ -10,8 +10,8 @@ deleting, and renaming profile blocks in `~/.untaped/config.yml`.
 Install both `untaped` and this plugin from git:
 
 ```bash
-uv tool install "git+https://github.com/alexisbeaulieu97/untaped.git" \
-  --with "untaped-profile @ git+https://github.com/alexisbeaulieu97/untaped-profile.git" \
+uv tool install "git+https://github.com/alexisbeaulieu97/untaped.git@v0.1.0" \
+  --with "untaped-profile @ git+https://github.com/alexisbeaulieu97/untaped-profile.git@v0.1.0" \
   --no-sources \
   --force
 ```

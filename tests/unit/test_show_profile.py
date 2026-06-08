@@ -1,5 +1,5 @@
-"""``FakeProfileRepository`` lives in ``tests/unit/conftest.py``; we keep
-fixture parameters typed as ``Any`` to avoid importlib-mode import issues.
+"""The ``repo`` fixture satisfies ``ProfileReader``; we keep fixture
+parameters typed as ``Any`` to avoid importlib-mode import issues.
 """
 
 from __future__ import annotations

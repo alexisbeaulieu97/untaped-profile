@@ -156,7 +156,7 @@ coverage gate.
 
 ## Recipe: Add a Profile Sub-command
 
-1. Write a use-case test with `FakeProfileRepository`.
+1. Write a use-case test with the fake profile ports fixture.
 2. Add or narrow a port in `application/ports.py` if the command needs new
    repository behavior.
 3. Implement the use case in `application/`.

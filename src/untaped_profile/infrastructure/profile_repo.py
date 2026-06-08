@@ -1,4 +1,4 @@
-"""YAML-backed adapter that satisfies :class:`ProfileRepository`.
+"""YAML-backed adapter for profile reader and writer ports.
 
 This is the only profile module that knows about the on-disk layout — the
 use cases stay portable. Every method delegates to ``untaped``'s

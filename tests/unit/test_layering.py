@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+import untaped_profile.application as application
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src" / "untaped_profile"
 
@@ -104,3 +106,8 @@ def test_infrastructure_does_not_read_global_settings() -> None:
                     violations.append(f"{rel}:{imp.lineno} imports {', '.join(bad)}")
 
     assert not violations, "\n".join(violations)
+
+
+def test_application_does_not_export_aggregate_profile_repository_port() -> None:
+    assert "ProfileRepository" not in application.__all__
+    assert not hasattr(application, "ProfileRepository")

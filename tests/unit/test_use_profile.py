@@ -27,10 +27,9 @@ def test_default_is_always_valid(empty_repo_factory: Any) -> None:
 def test_accepts_active_writer_without_data_write_surface() -> None:
     """Validates the parallel-sibling split: ``UseProfile`` runs against a
     stub that has ``set_active`` but **not** ``write`` / ``delete`` /
-    ``rename``. A linear ``ProfileReader ⊂ ProfileWriter ⊂
-    ProfileRepository`` chain would force ``UseProfile`` to type-accept
-    those data-write methods it never touches; this test pins the
-    sibling shape.
+    ``rename``. If ``ActiveProfileWriter`` inherited ``ProfileWriter``,
+    ``UseProfile`` would type-accept those data-write methods it never
+    touches; this test pins the sibling shape.
     """
     from untaped import ProfileSource
 

@@ -212,11 +212,7 @@ def _confirm_delete(preview: ProfileDeletePreview) -> None:
     typer.echo(f"config: {resolve_config_path()}", err=True)
     typer.echo(f"profile: {preview.name}", err=True)
     typer.echo(f"top-level keys: {top_level}", err=True)
-    confirmed = typer.confirm(
-        f"Delete profile {preview.name!r}?",
-        default=False,
-        err=True,
-    )
+    confirmed = ui_context(strict=False).confirm(f"Delete profile {preview.name!r}?")
     if not confirmed:
         typer.echo("delete cancelled", err=True)
         raise typer.Exit(code=1)

@@ -119,7 +119,10 @@ keep `name` as its first key because scripts depend on
   `--copy-from` data.
 - `DeleteProfile` refuses to delete the persisted active profile. The CLI
   previews the target and requires interactive confirmation or `--yes` before
-  deleting. `default` is not special-cased when another profile is active.
+  deleting. Interactive confirmation uses core
+  `ui_context(strict=False).confirm(...)`, renders on stderr, and requires TTY
+  stdin; automation must pass `--yes`. `default` is not special-cased when
+  another profile is active.
 - `RenameProfile` rejects empty new names, rejects renaming `default`, rejects
   `default` as a target, and preserves the persisted active pointer.
 

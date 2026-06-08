@@ -499,11 +499,28 @@ def test_delete_prompts_and_removes_when_confirmed(
 ) -> None:
     _seed(_isolate_config)
     monkeypatch.setattr("untaped_profile.cli.commands._stdin_is_interactive", lambda: True)
+    seen: dict[str, object] = {}
 
-    result = CliRunner().invoke(app, ["delete", "stage"], input="y\n")
+    class _PromptUi:
+        def confirm(self, message: str, *, default: bool = False) -> bool:
+            seen["message"] = message
+            seen["default"] = default
+            return True
+
+    def _ui_context(*_: object, **__: object) -> _PromptUi:
+        seen["context_called"] = True
+        return _PromptUi()
+
+    monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
+
+    result = CliRunner().invoke(app, ["delete", "stage"])
 
     assert result.exit_code == 0, result.output
-    assert "Delete profile 'stage'" in result.output
+    assert seen == {
+        "context_called": True,
+        "message": "Delete profile 'stage'?",
+        "default": False,
+    }
     assert "stage" not in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
 
@@ -512,11 +529,27 @@ def test_delete_decline_keeps_profile(
 ) -> None:
     _seed(_isolate_config)
     monkeypatch.setattr("untaped_profile.cli.commands._stdin_is_interactive", lambda: True)
+    seen: dict[str, object] = {}
 
-    result = CliRunner().invoke(app, ["delete", "stage"], input="n\n")
+    class _PromptUi:
+        def confirm(self, message: str, *, default: bool = False) -> bool:
+            seen["message"] = message
+            seen["default"] = default
+            return False
+
+    def _ui_context(*_: object, **__: object) -> _PromptUi:
+        return _PromptUi()
+
+    monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
+
+    result = CliRunner().invoke(app, ["delete", "stage"])
 
     assert result.exit_code != 0
     assert "delete cancelled" in result.output
+    assert seen == {
+        "message": "Delete profile 'stage'?",
+        "default": False,
+    }
     assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
 
@@ -527,22 +560,35 @@ def test_delete_prompt_summary_does_not_print_secret_values(
         "profiles:\n  prod: {}\n  stage:\n    github:\n      token: secret-value\nactive: prod\n"
     )
     monkeypatch.setattr("untaped_profile.cli.commands._stdin_is_interactive", lambda: True)
+    seen: dict[str, object] = {}
 
-    result = CliRunner().invoke(app, ["delete", "stage"], input="n\n")
+    class _PromptUi:
+        def confirm(self, message: str, *, default: bool = False) -> bool:
+            seen["message"] = message
+            seen["default"] = default
+            return False
+
+    def _ui_context(*_: object, **__: object) -> _PromptUi:
+        return _PromptUi()
+
+    monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
+
+    result = CliRunner().invoke(app, ["delete", "stage"])
 
     assert result.exit_code != 0
     assert "top-level keys: github" in result.output
     assert "secret-value" not in result.output
+    assert seen["message"] == "Delete profile 'stage'?"
     assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
 
 def test_delete_yes_does_not_prompt(_isolate_config: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _seed(_isolate_config)
 
-    def _confirm_delete(*args: object, **kwargs: object) -> None:
+    def _ui_context(*_: object, **__: object) -> object:
         raise AssertionError("should not prompt with --yes")
 
-    monkeypatch.setattr("untaped_profile.cli.commands._confirm_delete", _confirm_delete)
+    monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
 
     result = CliRunner().invoke(app, ["delete", "stage", "--yes"])
 

@@ -1,6 +1,5 @@
-"""``FakeProfileRepository`` is provided by the ``repo`` fixture in
-``tests/unit/conftest.py``; we use ``Any`` for type annotations to dodge
-the importlib-mode cross-file import problem.
+"""The ``repo`` fixture satisfies ``ProfileReader``; we use ``Any`` for type
+annotations to dodge the importlib-mode cross-file import problem.
 """
 
 from __future__ import annotations

@@ -1,10 +1,10 @@
 """Application-layer protocols (ports) for the profile bounded context.
 
-Four Protocols layered along two axes — read vs. write, and "writes
+Three Protocols are layered along two axes: read vs. write, and "writes
 profile data" vs. "writes the active-profile pointer". The parallel
 sibling shape (``ProfileWriter`` and ``ActiveProfileWriter`` both
-extending ``ProfileReader``) lets ``UseProfile`` declare ``set_active``
-without inheriting the data-write surface it never touches.
+extending ``ProfileReader``) lets each use case depend on the narrowest
+surface it needs.
 """
 
 from __future__ import annotations
@@ -39,13 +39,8 @@ class ActiveProfileWriter(ProfileReader, Protocol):
     def set_active(self, name: str) -> None: ...
 
 
-class ProfileRepository(ProfileWriter, ActiveProfileWriter, Protocol):
-    """Combines both writer axes; satisfied structurally by concrete adapters."""
-
-
 __all__ = [
     "ActiveProfileWriter",
     "ProfileReader",
-    "ProfileRepository",
     "ProfileWriter",
 ]

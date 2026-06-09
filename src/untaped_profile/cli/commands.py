@@ -189,7 +189,6 @@ def delete_command(
     yes: bool = typer.Option(
         False,
         "--yes",
-        "-y",
         help="Delete without interactive confirmation.",
     ),
 ) -> None:

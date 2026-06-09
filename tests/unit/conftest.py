@@ -1,7 +1,8 @@
 """Shared test scaffolding for the profile use cases.
 
-The fake ``ProfileRepository`` is the only thing application-layer tests
-need — the use cases never know about YAML, files, or the resolver.
+The fake profile ports satisfy ``ProfileReader``, ``ProfileWriter``, and
+``ActiveProfileWriter`` — the use cases never know about YAML, files, or
+the resolver.
 """
 
 from __future__ import annotations
@@ -40,8 +41,8 @@ def _register_secret_settings_for_redaction_tests() -> Iterator[None]:
     get_settings.cache_clear()
 
 
-class FakeProfileRepository:
-    """In-memory ``ProfileRepository`` that satisfies the application Protocol."""
+class FakeProfilePorts:
+    """In-memory fake satisfying the application port Protocols."""
 
     def __init__(
         self,
@@ -121,8 +122,8 @@ def _deep_merge_into(dst: dict[str, Any], src: dict[str, Any]) -> None:
 
 
 @pytest.fixture
-def repo() -> FakeProfileRepository:
-    return FakeProfileRepository(
+def repo() -> FakeProfilePorts:
+    return FakeProfilePorts(
         profiles={
             "default": {"log_level": "INFO", "awx": {"api_prefix": "/api/v2/"}},
             "prod": {"awx": {"base_url": "https://prod"}},
@@ -135,18 +136,16 @@ def repo() -> FakeProfileRepository:
 @pytest.fixture
 def empty_repo_factory() -> Callable[
     [dict[str, dict[str, Any]] | None, str | None, str | None],
-    FakeProfileRepository,
+    FakeProfilePorts,
 ]:
-    """Return a callable that builds a fresh ``FakeProfileRepository`` with
+    """Return a callable that builds a fresh ``FakeProfilePorts`` with
     custom seed data — used by tests that need a different fixture shape."""
 
     def _make(
         profiles: dict[str, dict[str, Any]] | None = None,
         active: str | None = None,
         effective_active: str | None = None,
-    ) -> FakeProfileRepository:
-        return FakeProfileRepository(
-            profiles=profiles, active=active, effective_active=effective_active
-        )
+    ) -> FakeProfilePorts:
+        return FakeProfilePorts(profiles=profiles, active=active, effective_active=effective_active)
 
     return _make

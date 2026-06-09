@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -494,6 +495,16 @@ def test_delete_requires_yes_when_non_interactive(_isolate_config: Path) -> None
     assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
 
+def test_delete_short_yes_alias_is_not_registered(_isolate_config: Path) -> None:
+    _seed(_isolate_config)
+
+    result = CliRunner().invoke(app, ["delete", "stage", "-y"])
+
+    assert result.exit_code == 2
+    assert "No such option: -y" in result.output
+    assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
+
+
 def test_delete_prompts_and_removes_when_confirmed(
     _isolate_config: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -635,3 +646,11 @@ def test_no_args_shows_help() -> None:
     result = CliRunner().invoke(app, [])
     assert result.exit_code == 2
     assert "Manage configuration profiles" in result.output or "Manage" in result.output
+
+
+def test_delete_help_lists_only_long_yes_option() -> None:
+    result = CliRunner().invoke(app, ["delete", "--help"])
+
+    assert result.exit_code == 0
+    assert "--yes" in result.output
+    assert re.search(r"(?<![\w-])-y\b", result.output) is None

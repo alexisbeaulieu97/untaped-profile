@@ -8,7 +8,6 @@ from untaped_profile.application.list_profiles import ListProfiles
 from untaped_profile.application.ports import (
     ActiveProfileWriter,
     ProfileReader,
-    ProfileRepository,
     ProfileWriter,
 )
 from untaped_profile.application.rename_profile import RenameProfile
@@ -23,7 +22,6 @@ __all__ = [
     "DeleteProfile",
     "ListProfiles",
     "ProfileReader",
-    "ProfileRepository",
     "ProfileWriter",
     "RenameProfile",
     "ShowProfile",

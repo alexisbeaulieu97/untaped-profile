@@ -4,7 +4,7 @@ The use case classifies *where* the active profile name came from
 (``env`` / ``config`` / ``fallback``) and validates that explicit
 pointers (env var or persisted ``active:`` key) actually name a profile
 that exists. Reading ``os.environ`` is the repository's job — the use
-case stays pure and depends only on ``ProfileRepository.classify_active``.
+case stays pure and depends only on ``ProfileReader.classify_active``.
 """
 
 from __future__ import annotations

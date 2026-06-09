@@ -653,4 +653,4 @@ def test_delete_help_lists_only_long_yes_option() -> None:
 
     assert result.exit_code == 0
     assert "--yes" in result.output
-    assert re.search(r"(?<!-)\b-y\b", result.output) is None
+    assert re.search(r"(?<![\w-])-y\b", result.output) is None

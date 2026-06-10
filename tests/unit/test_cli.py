@@ -648,14 +648,15 @@ def test_no_args_shows_help() -> None:
     assert "Manage configuration profiles" in result.output or "Manage" in result.output
 
 
-def test_required_argument_commands_show_help_without_arguments() -> None:
+def test_required_argument_commands_error_without_arguments() -> None:
     runner = CliInvoker()
 
     for args in (["use"], ["create"], ["delete"], ["rename"]):
         result = runner.invoke(app, args)
 
-        assert result.exit_code == 0, result.output
-        assert "Usage:" in result.output
+        assert result.exit_code == 2, result.output
+        assert result.stdout == ""
+        assert "requires an argument" in result.stderr
 
 
 def test_delete_help_lists_only_long_yes_option() -> None:

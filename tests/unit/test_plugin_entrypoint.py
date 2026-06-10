@@ -156,7 +156,9 @@ def test_root_profile_flag_is_available_on_profile_mutations(_isolate_config: Pa
     )
     app = build_app(plugins=[profile_plugin])
 
-    result = CliInvoker().invoke(app, ["profile", "use", "stage", "--profile", "prod"])
+    # The root --profile flag must precede the command; mutating commands do
+    # not expose a command-local --profile selector.
+    result = CliInvoker().invoke(app, ["--profile", "prod", "profile", "use", "stage"])
 
     assert result.exit_code == 0, result.output
     assert "active profile: stage" in result.output

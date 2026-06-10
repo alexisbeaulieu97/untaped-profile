@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Annotated, Literal, NoReturn
+from typing import Annotated, Literal
 
 import yaml
 from cyclopts import Parameter
@@ -12,14 +12,13 @@ from untaped import (
     ColumnsOption,
     ConfigError,
     FormatOption,
-    OutputFormat,
     ProfileOverrideOption,
-    UiContext,
     create_app,
     echo,
     get_profile_settings_model,
     profile_override,
     redact_secrets,
+    render_rows,
     report_errors,
     resolve_config_path,
     secret_field_paths,
@@ -60,7 +59,7 @@ def list_command(
     with report_errors(), profile_override(profile):
         profiles = ListProfiles(ProfileFileRepository())()
         rows: list[dict[str, object]] = [_profile_row(p) for p in profiles]
-        echo(_render_collection(rows, fmt=fmt, columns=columns))
+        echo(render_rows(rows, fmt=fmt, columns=columns))
 
 
 @app.command(name="show")
@@ -69,6 +68,7 @@ def show_command(
         str | None,
         Parameter(help="Profile name to inspect; defaults to the current profile."),
     ] = None,
+    /,
     *,
     raw: Annotated[
         bool,
@@ -139,11 +139,10 @@ def show_command(
 
 @app.command(name="use")
 def use_command(
-    name: Annotated[str | None, Parameter(name="", help="Profile to activate.")] = None,
+    name: Annotated[str, Parameter(help="Profile to activate.")],
+    /,
 ) -> None:
     """Persist ``active: <name>`` in the config file."""
-    if name is None:
-        _show_command_help("use")
     with report_errors():
         UseProfile(ProfileFileRepository())(name)
         echo(f"active profile: {name} (config: {resolve_config_path()})", err=True)
@@ -170,7 +169,8 @@ def current_command(
 
 @app.command(name="create")
 def create_command(
-    name: Annotated[str | None, Parameter(name="", help="Name of the new profile.")] = None,
+    name: Annotated[str, Parameter(help="Name of the new profile.")],
+    /,
     *,
     copy_from: Annotated[
         str | None,
@@ -178,8 +178,6 @@ def create_command(
     ] = None,
 ) -> None:
     """Create a new profile (empty by default; use ``--copy-from`` to seed it)."""
-    if name is None:
-        _show_command_help("create")
     with report_errors():
         CreateProfile(ProfileFileRepository())(name, copy_from=copy_from)
         suffix = f" (copied from {copy_from})" if copy_from else ""
@@ -188,7 +186,8 @@ def create_command(
 
 @app.command(name="delete")
 def delete_command(
-    name: Annotated[str | None, Parameter(name="", help="Profile to remove.")] = None,
+    name: Annotated[str, Parameter(help="Profile to remove.")],
+    /,
     *,
     yes: Annotated[
         bool,
@@ -196,8 +195,6 @@ def delete_command(
     ] = False,
 ) -> None:
     """Delete a profile. Refuses to delete the active profile."""
-    if name is None:
-        _show_command_help("delete")
     with report_errors():
         repo = ProfileFileRepository()
         delete_profile = DeleteProfile(repo)
@@ -228,20 +225,14 @@ def _stdin_is_interactive() -> bool:
 
 @app.command(name="rename")
 def rename_command(
-    old_name: Annotated[str | None, Parameter(name="", help="Existing profile name.")] = None,
-    new_name: Annotated[str | None, Parameter(name="", help="New profile name.")] = None,
+    old_name: Annotated[str, Parameter(help="Existing profile name.")],
+    new_name: Annotated[str, Parameter(help="New profile name.")],
+    /,
 ) -> None:
     """Rename a profile, updating ``active:`` if it pointed at the old name."""
-    if old_name is None or new_name is None:
-        _show_command_help("rename")
     with report_errors():
         RenameProfile(ProfileFileRepository())(old_name, new_name)
         echo(f"renamed profile: {old_name} → {new_name}", err=True)
-
-
-def _show_command_help(command: str) -> NoReturn:
-    app.help_print([command])
-    raise SystemExit()
 
 
 def _profile_row(p: Profile) -> dict[str, object]:
@@ -254,14 +245,3 @@ def _profile_row(p: Profile) -> dict[str, object]:
         "active": "✓" if p.is_active else "",
         "keys": p.key_count,
     }
-
-
-def _render_collection(
-    rows: list[dict[str, object]],
-    *,
-    fmt: OutputFormat,
-    columns: list[str] | None,
-) -> str:
-    if fmt == "table":
-        return ui_context().collection(rows, fmt=fmt, columns=columns)
-    return UiContext().collection(rows, fmt=fmt, columns=columns)

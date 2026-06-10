@@ -12,7 +12,7 @@ from untaped_profile import app
 
 class ProfilePlugin:
     id = "profile"
-    untaped_api_version = 1
+    untaped_api_version = 2
 
     def register(self, registry: PluginRegistry) -> None:
         registry.add_cli("profile", app)

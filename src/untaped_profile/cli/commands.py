@@ -1,23 +1,24 @@
-"""Typer commands: ``untaped profile list / show / use / current / create / delete / rename``."""
+"""Cyclopts commands: ``untaped profile list / show / use / current / create / delete / rename``."""
 
 from __future__ import annotations
 
 import json
 import sys
-from typing import Literal
+from typing import Annotated, Literal
 
-import typer
 import yaml
+from cyclopts import Parameter
 from untaped import (
     ColumnsOption,
     ConfigError,
     FormatOption,
-    OutputFormat,
     ProfileOverrideOption,
-    UiContext,
+    create_app,
+    echo,
     get_profile_settings_model,
     profile_override,
     redact_secrets,
+    render_rows,
     report_errors,
     resolve_config_path,
     secret_field_paths,
@@ -38,23 +39,18 @@ from untaped_profile.infrastructure import ProfileFileRepository
 
 # `profile show` returns a single nested object — `raw`/`table` (which want
 # tabular rows) don't apply, so narrow the format type for this command and
-# let Typer reject other values at parse time.
+# let Cyclopts reject other values at parse time.
 ShowFormat = Literal["yaml", "json"]
 
-app = typer.Typer(
+app = create_app(
     name="profile",
     help="Manage configuration profiles in ``~/.untaped/config.yml``.",
-    no_args_is_help=True,
 )
 
 
-@app.callback()
-def _callback() -> None:
-    """Manage configuration profiles in ``~/.untaped/config.yml``."""
-
-
-@app.command("list")
+@app.command(name="list")
 def list_command(
+    *,
     fmt: FormatOption = "table",
     columns: ColumnsOption = None,
     profile: ProfileOverrideOption = None,
@@ -63,30 +59,32 @@ def list_command(
     with report_errors(), profile_override(profile):
         profiles = ListProfiles(ProfileFileRepository())()
         rows: list[dict[str, object]] = [_profile_row(p) for p in profiles]
-        typer.echo(_render_collection(rows, fmt=fmt, columns=columns))
+        echo(render_rows(rows, fmt=fmt, columns=columns))
 
 
-@app.command("show")
+@app.command(name="show")
 def show_command(
-    name: str | None = typer.Argument(
-        None, help="Profile name to inspect; defaults to the current profile."
-    ),
-    raw: bool = typer.Option(
-        False,
-        "--raw",
-        help="Show only the keys this profile literally sets (no `default` fallback merge).",
-    ),
-    show_secrets: bool = typer.Option(
-        False,
-        "--show-secrets",
-        help="Reveal secret values instead of `***`.",
-    ),
-    fmt: ShowFormat = typer.Option(
-        "yaml",
-        "--format",
-        "-f",
-        help="Output format (yaml or json).",
-    ),
+    name: Annotated[
+        str | None,
+        Parameter(help="Profile name to inspect; defaults to the current profile."),
+    ] = None,
+    /,
+    *,
+    raw: Annotated[
+        bool,
+        Parameter(
+            name="--raw",
+            help="Show only the keys this profile literally sets (no `default` fallback merge).",
+        ),
+    ] = False,
+    show_secrets: Annotated[
+        bool,
+        Parameter(name="--show-secrets", help="Reveal secret values instead of `***`."),
+    ] = False,
+    fmt: Annotated[
+        ShowFormat,
+        Parameter(name=["--format", "-f"], help="Output format (yaml or json)."),
+    ] = "yaml",
     profile: ProfileOverrideOption = None,
 ) -> None:
     """Print a profile's contents (effective view by default).
@@ -119,7 +117,7 @@ def show_command(
             header += " (active)"
         if not raw:
             header += " — effective view (default ⤥ named)"
-        typer.echo(header, err=True)
+        echo(header, err=True)
         data = (
             target_profile.data
             if show_secrets
@@ -134,23 +132,25 @@ def show_command(
                 "raw": raw,
                 "data": data,
             }
-            typer.echo(json.dumps(envelope))
+            echo(json.dumps(envelope))
         else:
-            typer.echo(yaml.safe_dump(data, sort_keys=False, default_flow_style=False).rstrip())
+            echo(yaml.safe_dump(data, sort_keys=False, default_flow_style=False).rstrip())
 
 
-@app.command("use", no_args_is_help=True)
+@app.command(name="use")
 def use_command(
-    name: str = typer.Argument(..., help="Profile to activate."),
+    name: Annotated[str, Parameter(help="Profile to activate.")],
+    /,
 ) -> None:
     """Persist ``active: <name>`` in the config file."""
     with report_errors():
         UseProfile(ProfileFileRepository())(name)
-        typer.echo(f"active profile: {name} (config: {resolve_config_path()})", err=True)
+        echo(f"active profile: {name} (config: {resolve_config_path()})", err=True)
 
 
-@app.command("current")
+@app.command(name="current")
 def current_command(
+    *,
     profile: ProfileOverrideOption = None,
 ) -> None:
     """Print the effective active profile name to stdout (pipe-friendly).
@@ -163,34 +163,36 @@ def current_command(
     """
     with report_errors(), profile_override(profile):
         result = CurrentProfile(ProfileFileRepository())()
-        typer.echo(result.name)
-        typer.echo(f"(source: {result.source})", err=True)
+        echo(result.name)
+        echo(f"(source: {result.source})", err=True)
 
 
-@app.command("create", no_args_is_help=True)
+@app.command(name="create")
 def create_command(
-    name: str = typer.Argument(..., help="Name of the new profile."),
-    copy_from: str | None = typer.Option(
-        None,
-        "--copy-from",
-        help="Existing profile to copy as a starting point.",
-    ),
+    name: Annotated[str, Parameter(help="Name of the new profile.")],
+    /,
+    *,
+    copy_from: Annotated[
+        str | None,
+        Parameter(name="--copy-from", help="Existing profile to copy as a starting point."),
+    ] = None,
 ) -> None:
     """Create a new profile (empty by default; use ``--copy-from`` to seed it)."""
     with report_errors():
         CreateProfile(ProfileFileRepository())(name, copy_from=copy_from)
         suffix = f" (copied from {copy_from})" if copy_from else ""
-        typer.echo(f"created profile: {name}{suffix}", err=True)
+        echo(f"created profile: {name}{suffix}", err=True)
 
 
-@app.command("delete", no_args_is_help=True)
+@app.command(name="delete")
 def delete_command(
-    name: str = typer.Argument(..., help="Profile to remove."),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        help="Delete without interactive confirmation.",
-    ),
+    name: Annotated[str, Parameter(help="Profile to remove.")],
+    /,
+    *,
+    yes: Annotated[
+        bool,
+        Parameter(name="--yes", negative="", help="Delete without interactive confirmation."),
+    ] = False,
 ) -> None:
     """Delete a profile. Refuses to delete the active profile."""
     with report_errors():
@@ -200,7 +202,7 @@ def delete_command(
         if not yes:
             _confirm_delete(preview)
         delete_profile(name)
-        typer.echo(f"deleted profile: {name}", err=True)
+        echo(f"deleted profile: {name}", err=True)
 
 
 def _confirm_delete(preview: ProfileDeletePreview) -> None:
@@ -208,28 +210,29 @@ def _confirm_delete(preview: ProfileDeletePreview) -> None:
         raise ConfigError("profile delete requires --yes when stdin is not interactive")
 
     top_level = ", ".join(preview.top_level_keys) or "(none)"
-    typer.echo(f"config: {resolve_config_path()}", err=True)
-    typer.echo(f"profile: {preview.name}", err=True)
-    typer.echo(f"top-level keys: {top_level}", err=True)
+    echo(f"config: {resolve_config_path()}", err=True)
+    echo(f"profile: {preview.name}", err=True)
+    echo(f"top-level keys: {top_level}", err=True)
     confirmed = ui_context(strict=False).confirm(f"Delete profile {preview.name!r}?")
     if not confirmed:
-        typer.echo("delete cancelled", err=True)
-        raise typer.Exit(code=1)
+        echo("delete cancelled", err=True)
+        raise SystemExit(1)
 
 
 def _stdin_is_interactive() -> bool:
     return sys.stdin.isatty()
 
 
-@app.command("rename", no_args_is_help=True)
+@app.command(name="rename")
 def rename_command(
-    old_name: str = typer.Argument(..., help="Existing profile name."),
-    new_name: str = typer.Argument(..., help="New profile name."),
+    old_name: Annotated[str, Parameter(help="Existing profile name.")],
+    new_name: Annotated[str, Parameter(help="New profile name.")],
+    /,
 ) -> None:
     """Rename a profile, updating ``active:`` if it pointed at the old name."""
     with report_errors():
         RenameProfile(ProfileFileRepository())(old_name, new_name)
-        typer.echo(f"renamed profile: {old_name} → {new_name}", err=True)
+        echo(f"renamed profile: {old_name} → {new_name}", err=True)
 
 
 def _profile_row(p: Profile) -> dict[str, object]:
@@ -242,14 +245,3 @@ def _profile_row(p: Profile) -> dict[str, object]:
         "active": "✓" if p.is_active else "",
         "keys": p.key_count,
     }
-
-
-def _render_collection(
-    rows: list[dict[str, object]],
-    *,
-    fmt: OutputFormat,
-    columns: list[str] | None,
-) -> str:
-    if fmt == "table":
-        return ui_context().collection(rows, fmt=fmt, columns=columns)
-    return UiContext().collection(rows, fmt=fmt, columns=columns)

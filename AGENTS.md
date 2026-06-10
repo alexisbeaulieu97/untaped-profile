@@ -21,7 +21,7 @@ output helpers, and config-file primitives.
 3. **Expose the plugin through the `untaped.plugins` entry point.**
    `profile = "untaped_profile.plugin:plugin"` is the public integration
    point. The plugin object must expose `id = "profile"`, literal
-   `untaped_api_version = 1`, and `register(registry)`.
+   `untaped_api_version = 2`, and `register(registry)`.
 4. **Use the 4-layer DDD layout.** `cli -> application -> domain`, with
    `infrastructure -> domain`; `application` and `infrastructure` must not
    import each other at runtime.
@@ -31,10 +31,14 @@ output helpers, and config-file primitives.
    never relative imports.
 7. **Every source module has a module docstring.** Re-export `__init__.py`
    files are exempt.
-8. **Every Typer app and every command with required args sets
-   `no_args_is_help=True`.**
+8. **Cyclopts command signatures are explicit.** Use
+   `Annotated[..., Parameter(...)]` and name documented commands/options
+   explicitly. Required inputs are required positional-only params
+   (`Parameter(help=...)` before `/`); a missing value renders
+   `error: ... requires an argument` (exit 2) automatically — never an
+   optional default plus a manual help dance.
 9. **stdout is data only.** Prompts, progress, and status messages go to
-   stderr via `typer.echo(..., err=True)`.
+   stderr via `echo(..., err=True)`.
 10. **Pipe-friendly commands keep stable raw identifiers.** For `profile
     list`, `_profile_row()` must keep `name` as the first key.
 11. **Secrets stay secret.** Redaction uses `secret_field_paths` from the
@@ -49,7 +53,7 @@ output helpers, and config-file primitives.
 src/untaped_profile/
 ├── __init__.py           # re-exports app
 ├── plugin.py             # entry-point plugin object
-├── cli/                  # Typer commands; composition root
+├── cli/                  # Cyclopts commands; composition root
 ├── application/          # use cases and ports
 ├── domain/               # pure models
 └── infrastructure/       # config-file adapter
@@ -160,7 +164,7 @@ coverage gate.
 2. Add or narrow a port in `application/ports.py` if the command needs new
    repository behavior.
 3. Implement the use case in `application/`.
-4. Wire the Typer command in `cli/commands.py`; keep stdout data-only.
+4. Wire the Cyclopts command in `cli/commands.py`; keep stdout data-only.
 5. If the command writes, add a `ProfileFileRepository` test against a temp
    `config.yml`.
 6. Run `uv run untaped profile <command> --help` plus the full verification

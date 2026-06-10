@@ -1,4 +1,4 @@
-"""End-to-end tests for ``untaped profile <…>`` via Typer's ``CliRunner``."""
+"""End-to-end tests for ``untaped profile <...>`` via the shared CLI invoker."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 import yaml
-from typer.testing import CliRunner
 from untaped import get_settings
+from untaped.testing import CliInvoker
 
 from untaped_profile import app
 
@@ -54,7 +54,7 @@ def _seed_with_secrets(cfg: Path) -> None:
 
 def test_list_outputs_all_profiles(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["list", "--format", "raw", "--columns", "name"])
+    result = CliInvoker().invoke(app, ["list", "--format", "raw", "--columns", "name"])
     assert result.exit_code == 0, result.output
     names = result.stdout.splitlines()
     assert sorted(names) == ["default", "prod", "stage"]
@@ -62,7 +62,7 @@ def test_list_outputs_all_profiles(_isolate_config: Path) -> None:
 
 def test_list_marks_active_profile(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(
+    result = CliInvoker().invoke(
         app,
         ["list", "--format", "raw", "--columns", "name", "--columns", "active"],
     )
@@ -86,7 +86,7 @@ def test_list_table_honours_global_ui_collection_view(_isolate_config: Path) -> 
     )
     get_settings.cache_clear()
 
-    result = CliRunner().invoke(app, ["list", "--format", "table"])
+    result = CliInvoker().invoke(app, ["list", "--format", "table"])
 
     assert result.exit_code == 0, result.output
     assert "name: default" in result.stdout
@@ -110,7 +110,7 @@ def test_list_raw_ignores_unknown_global_ui_theme(_isolate_config: Path) -> None
     )
     get_settings.cache_clear()
 
-    result = CliRunner().invoke(app, ["list", "--format", "raw", "--columns", "name"])
+    result = CliInvoker().invoke(app, ["list", "--format", "raw", "--columns", "name"])
 
     assert result.exit_code == 0, result.output
     assert result.stdout.splitlines() == ["default", "prod"]
@@ -122,7 +122,7 @@ def test_list_raw_ignores_unknown_global_ui_theme(_isolate_config: Path) -> None
 
 def test_show_default_returns_resolved_view(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod"])
+    result = CliInvoker().invoke(app, ["show", "prod"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload == {"log_level": "INFO", "awx": {"base_url": "https://prod"}}
@@ -130,7 +130,7 @@ def test_show_default_returns_resolved_view(_isolate_config: Path) -> None:
 
 def test_show_without_name_uses_current_profile_from_config(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show"])
+    result = CliInvoker().invoke(app, ["show"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload == {"log_level": "INFO", "awx": {"base_url": "https://prod"}}
@@ -142,7 +142,7 @@ def test_show_without_name_honours_env_override(
 ) -> None:
     _seed(_isolate_config)
     monkeypatch.setenv("UNTAPED_PROFILE", "stage")
-    result = CliRunner().invoke(app, ["show"])
+    result = CliInvoker().invoke(app, ["show"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload == {"log_level": "INFO", "awx": {"base_url": "https://stage"}}
@@ -151,7 +151,7 @@ def test_show_without_name_honours_env_override(
 
 def test_show_without_name_json_uses_current_profile(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "--format", "json"])
+    result = CliInvoker().invoke(app, ["show", "--format", "json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     assert payload["name"] == "prod"
@@ -165,7 +165,7 @@ def test_show_without_name_errors_on_typoed_env_var(
 ) -> None:
     _seed(_isolate_config)
     monkeypatch.setenv("UNTAPED_PROFILE", "ghost")
-    result = CliRunner().invoke(app, ["show"])
+    result = CliInvoker().invoke(app, ["show"])
     assert result.exit_code != 0
     assert "ghost" in result.output or "ghost" in result.stderr
 
@@ -175,7 +175,7 @@ def test_show_without_name_falls_back_to_default_with_no_config(
 ) -> None:
     monkeypatch.delenv("UNTAPED_PROFILE", raising=False)
     assert not _isolate_config.exists()
-    result = CliRunner().invoke(app, ["show"])
+    result = CliInvoker().invoke(app, ["show"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload == {}
@@ -187,14 +187,14 @@ def test_show_explicit_default_still_requires_default_profile(
 ) -> None:
     monkeypatch.delenv("UNTAPED_PROFILE", raising=False)
     assert not _isolate_config.exists()
-    result = CliRunner().invoke(app, ["show", "default"])
+    result = CliInvoker().invoke(app, ["show", "default"])
     assert result.exit_code != 0
     assert "default" in result.output or "default" in result.stderr
 
 
 def test_show_raw_returns_only_what_profile_sets(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--raw"])
+    result = CliInvoker().invoke(app, ["show", "prod", "--raw"])
     assert result.exit_code == 0
     payload = yaml.safe_load(result.stdout)
     assert payload == {"awx": {"base_url": "https://prod"}}
@@ -202,13 +202,13 @@ def test_show_raw_returns_only_what_profile_sets(_isolate_config: Path) -> None:
 
 def test_show_unknown_profile_errors(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "ghost"])
+    result = CliInvoker().invoke(app, ["show", "ghost"])
     assert result.exit_code != 0
 
 
 def test_show_empty_name_does_not_fallback_to_current(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", ""])
+    result = CliInvoker().invoke(app, ["show", ""])
     assert result.exit_code != 0
     assert "does not exist" in result.output or "does not exist" in result.stderr
 
@@ -218,7 +218,7 @@ def test_show_json_emits_structured_envelope(_isolate_config: Path) -> None:
     documented usage. JSON output wraps the profile data in
     ``{name, active, raw, data}`` so jq users can address each field."""
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--format", "json"])
+    result = CliInvoker().invoke(app, ["show", "prod", "--format", "json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     assert payload["name"] == "prod"
@@ -231,7 +231,7 @@ def test_show_json_raw_flag_is_recorded(_isolate_config: Path) -> None:
     """``raw=True`` shows up in the JSON envelope so a downstream
     consumer can tell which view was rendered."""
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--raw", "--format", "json"])
+    result = CliInvoker().invoke(app, ["show", "prod", "--raw", "--format", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["raw"] is True
@@ -242,7 +242,7 @@ def test_show_redacts_secrets_by_default_yaml(_isolate_config: Path) -> None:
     """Default YAML output must mask SecretStr fields — terminal scrollback,
     shell captures, and copy/paste should never carry a raw AWX/GitHub token."""
     _seed_with_secrets(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod"])
+    result = CliInvoker().invoke(app, ["show", "prod"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload["awx"]["token"] == "***"
@@ -258,7 +258,7 @@ def test_show_redacts_secrets_by_default_yaml(_isolate_config: Path) -> None:
 def test_show_redacts_secrets_by_default_json(_isolate_config: Path) -> None:
     """Same redaction applies to the JSON envelope's ``data`` payload."""
     _seed_with_secrets(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--format", "json"])
+    result = CliInvoker().invoke(app, ["show", "prod", "--format", "json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     assert payload["data"]["awx"]["token"] == "***"
@@ -272,7 +272,7 @@ def test_show_secrets_flag_reveals_raw_values(_isolate_config: Path) -> None:
     """``--show-secrets`` is the explicit opt-in for the rare case the user
     actually needs the token (e.g. reading it back into env)."""
     _seed_with_secrets(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--show-secrets"])
+    result = CliInvoker().invoke(app, ["show", "prod", "--show-secrets"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload["awx"]["token"] == "super-secret-aap"
@@ -281,7 +281,7 @@ def test_show_secrets_flag_reveals_raw_values(_isolate_config: Path) -> None:
 
 def test_show_secrets_flag_reveals_raw_values_json(_isolate_config: Path) -> None:
     _seed_with_secrets(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--show-secrets", "--format", "json"])
+    result = CliInvoker().invoke(app, ["show", "prod", "--show-secrets", "--format", "json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     assert payload["data"]["awx"]["token"] == "super-secret-aap"
@@ -292,7 +292,7 @@ def test_show_redaction_no_op_when_secrets_absent(_isolate_config: Path) -> None
     """A profile that doesn't set any secret-typed field must produce the
     same output as before — redaction must not invent ``***`` placeholders."""
     _seed(_isolate_config)  # the existing seed has no tokens
-    result = CliRunner().invoke(app, ["show", "prod"])
+    result = CliInvoker().invoke(app, ["show", "prod"])
     assert result.exit_code == 0, result.output
     payload = yaml.safe_load(result.stdout)
     assert payload == {"log_level": "INFO", "awx": {"base_url": "https://prod"}}
@@ -304,7 +304,7 @@ def test_show_rejects_unsupported_formats(_isolate_config: Path, bad_fmt: str) -
     falling through to YAML would lie to scripts that requested a specific
     pipe-friendly shape. Reject at parse time instead."""
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["show", "prod", "--format", bad_fmt])
+    result = CliInvoker().invoke(app, ["show", "prod", "--format", bad_fmt])
     assert result.exit_code != 0
     assert bad_fmt in result.output.lower() or "invalid" in result.output.lower()
 
@@ -314,14 +314,14 @@ def test_show_rejects_unsupported_formats(_isolate_config: Path, bad_fmt: str) -
 
 def test_use_persists_active(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["use", "stage"])
+    result = CliInvoker().invoke(app, ["use", "stage"])
     assert result.exit_code == 0, result.output
     assert yaml.safe_load(_isolate_config.read_text())["active"] == "stage"
 
 
 def test_use_unknown_profile_errors(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["use", "ghost"])
+    result = CliInvoker().invoke(app, ["use", "ghost"])
     assert result.exit_code != 0
 
 
@@ -334,7 +334,7 @@ def test_current_prints_active_from_config(
     """`active: prod` in the config → stdout 'prod', stderr names config."""
     monkeypatch.delenv("UNTAPED_PROFILE", raising=False)
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["current"])
+    result = CliInvoker().invoke(app, ["current"])
     assert result.exit_code == 0, result.output
     assert result.stdout.splitlines() == ["prod"]
     assert "(source: config)" in result.stderr
@@ -346,7 +346,7 @@ def test_current_falls_back_to_default_with_no_config(
     """No config file at all → 'default' on stdout, source 'fallback'."""
     monkeypatch.delenv("UNTAPED_PROFILE", raising=False)
     assert not _isolate_config.exists()
-    result = CliRunner().invoke(app, ["current"])
+    result = CliInvoker().invoke(app, ["current"])
     assert result.exit_code == 0, result.output
     assert result.stdout.splitlines() == ["default"]
     assert "(source: fallback)" in result.stderr
@@ -356,7 +356,7 @@ def test_current_env_var_overrides(_isolate_config: Path, monkeypatch: pytest.Mo
     """UNTAPED_PROFILE wins over `active:` and is reported as `env`."""
     _seed(_isolate_config)  # active: prod
     monkeypatch.setenv("UNTAPED_PROFILE", "stage")
-    result = CliRunner().invoke(app, ["current"])
+    result = CliInvoker().invoke(app, ["current"])
     assert result.exit_code == 0, result.output
     assert result.stdout.splitlines() == ["stage"]
     assert "(source: env)" in result.stderr
@@ -370,7 +370,7 @@ def test_current_stdout_is_pipe_friendly(
     awk/cut. Source breadcrumbs go to stderr."""
     monkeypatch.delenv("UNTAPED_PROFILE", raising=False)
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["current"])
+    result = CliInvoker().invoke(app, ["current"])
     assert result.exit_code == 0
     assert result.stdout == "prod\n"
 
@@ -384,7 +384,7 @@ def test_current_errors_on_typoed_env_var(
     would otherwise blow up downstream with a less helpful error."""
     _seed(_isolate_config)
     monkeypatch.setenv("UNTAPED_PROFILE", "ghost")
-    result = CliRunner().invoke(app, ["current"])
+    result = CliInvoker().invoke(app, ["current"])
     assert result.exit_code != 0
     assert "ghost" in result.output or "ghost" in result.stderr
 
@@ -394,7 +394,7 @@ def test_current_errors_on_typoed_env_var(
 
 def test_create_empty_profile(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["create", "homelab"])
+    result = CliInvoker().invoke(app, ["create", "homelab"])
     assert result.exit_code == 0, result.output
     data = yaml.safe_load(_isolate_config.read_text())
     assert data["profiles"]["homelab"] == {}
@@ -402,7 +402,7 @@ def test_create_empty_profile(_isolate_config: Path) -> None:
 
 def test_create_with_copy_from(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["create", "homelab", "--copy-from", "prod"])
+    result = CliInvoker().invoke(app, ["create", "homelab", "--copy-from", "prod"])
     assert result.exit_code == 0, result.output
     data = yaml.safe_load(_isolate_config.read_text())
     assert data["profiles"]["homelab"] == {"awx": {"base_url": "https://prod"}}
@@ -410,7 +410,7 @@ def test_create_with_copy_from(_isolate_config: Path) -> None:
 
 def test_create_rejects_existing(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["create", "prod"])
+    result = CliInvoker().invoke(app, ["create", "prod"])
     assert result.exit_code != 0
 
 
@@ -421,7 +421,7 @@ def test_create_on_empty_config_does_not_materialise_default(_isolate_config: Pa
     a follow-up ``Settings()`` load (the path ``untaped config list`` takes)
     succeeds without raising."""
     assert not _isolate_config.exists()
-    result = CliRunner().invoke(app, ["create", "stage"])
+    result = CliInvoker().invoke(app, ["create", "stage"])
     assert result.exit_code == 0, result.output
     data = yaml.safe_load(_isolate_config.read_text())
     assert list(data["profiles"]) == ["stage"]
@@ -436,7 +436,7 @@ def test_create_on_empty_config_does_not_materialise_default(_isolate_config: Pa
 
 def test_delete_removes_profile(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["delete", "stage", "--yes"])
+    result = CliInvoker().invoke(app, ["delete", "stage", "--yes"])
     assert result.exit_code == 0, result.output
     assert "stage" not in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
@@ -445,7 +445,7 @@ def test_delete_default_when_not_active(_isolate_config: Path) -> None:
     """`default` is now an optional profile — deleting it when another
     profile is active just clears the shared-overrides layer."""
     _seed(_isolate_config)  # active: prod
-    result = CliRunner().invoke(app, ["delete", "default", "--yes"])
+    result = CliInvoker().invoke(app, ["delete", "default", "--yes"])
     assert result.exit_code == 0, result.output
     data = yaml.safe_load(_isolate_config.read_text())
     assert "default" not in data["profiles"]
@@ -456,13 +456,13 @@ def test_delete_default_refused_when_active(_isolate_config: Path) -> None:
     _isolate_config.write_text(
         "profiles:\n  default:\n    log_level: INFO\n  prod: {}\nactive: default\n"
     )
-    result = CliRunner().invoke(app, ["delete", "default"])
+    result = CliInvoker().invoke(app, ["delete", "default"])
     assert result.exit_code != 0
 
 
 def test_delete_active_refused(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["delete", "prod"])
+    result = CliInvoker().invoke(app, ["delete", "prod"])
     assert result.exit_code != 0
 
 
@@ -478,7 +478,7 @@ def test_delete_active_refused_before_prompt(
 
     monkeypatch.setattr("untaped_profile.cli.commands._confirm_delete", _confirm_delete)
 
-    result = CliRunner().invoke(app, ["delete", "prod"])
+    result = CliInvoker().invoke(app, ["delete", "prod"])
 
     assert result.exit_code != 0
     assert "active profile" in result.output
@@ -488,7 +488,7 @@ def test_delete_active_refused_before_prompt(
 def test_delete_requires_yes_when_non_interactive(_isolate_config: Path) -> None:
     _seed(_isolate_config)
 
-    result = CliRunner().invoke(app, ["delete", "stage"])
+    result = CliInvoker().invoke(app, ["delete", "stage"])
 
     assert result.exit_code != 0
     assert "--yes" in result.output
@@ -498,10 +498,10 @@ def test_delete_requires_yes_when_non_interactive(_isolate_config: Path) -> None
 def test_delete_short_yes_alias_is_not_registered(_isolate_config: Path) -> None:
     _seed(_isolate_config)
 
-    result = CliRunner().invoke(app, ["delete", "stage", "-y"])
+    result = CliInvoker().invoke(app, ["delete", "stage", "-y"])
 
-    assert result.exit_code == 2
-    assert "No such option: -y" in result.output
+    assert result.exit_code != 0
+    assert "-y" in result.output
     assert "stage" in yaml.safe_load(_isolate_config.read_text())["profiles"]
 
 
@@ -524,7 +524,7 @@ def test_delete_prompts_and_removes_when_confirmed(
 
     monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
 
-    result = CliRunner().invoke(app, ["delete", "stage"])
+    result = CliInvoker().invoke(app, ["delete", "stage"])
 
     assert result.exit_code == 0, result.output
     assert seen == {
@@ -553,7 +553,7 @@ def test_delete_decline_keeps_profile(
 
     monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
 
-    result = CliRunner().invoke(app, ["delete", "stage"])
+    result = CliInvoker().invoke(app, ["delete", "stage"])
 
     assert result.exit_code != 0
     assert "delete cancelled" in result.output
@@ -584,7 +584,7 @@ def test_delete_prompt_summary_does_not_print_secret_values(
 
     monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
 
-    result = CliRunner().invoke(app, ["delete", "stage"])
+    result = CliInvoker().invoke(app, ["delete", "stage"])
 
     assert result.exit_code != 0
     assert "top-level keys: github" in result.output
@@ -601,7 +601,7 @@ def test_delete_yes_does_not_prompt(_isolate_config: Path, monkeypatch: pytest.M
 
     monkeypatch.setattr("untaped_profile.cli.commands.ui_context", _ui_context)
 
-    result = CliRunner().invoke(app, ["delete", "stage", "--yes"])
+    result = CliInvoker().invoke(app, ["delete", "stage", "--yes"])
 
     assert result.exit_code == 0, result.output
     assert "stage" not in yaml.safe_load(_isolate_config.read_text())["profiles"]
@@ -612,7 +612,7 @@ def test_delete_yes_does_not_prompt(_isolate_config: Path, monkeypatch: pytest.M
 
 def test_rename_keeps_data_and_updates_active(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["rename", "prod", "production"])
+    result = CliInvoker().invoke(app, ["rename", "prod", "production"])
     assert result.exit_code == 0, result.output
     data = yaml.safe_load(_isolate_config.read_text())
     assert data["profiles"]["production"] == {"awx": {"base_url": "https://prod"}}
@@ -622,13 +622,13 @@ def test_rename_keeps_data_and_updates_active(_isolate_config: Path) -> None:
 
 def test_rename_default_refused(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["rename", "default", "main"])
+    result = CliInvoker().invoke(app, ["rename", "default", "main"])
     assert result.exit_code != 0
 
 
 def test_rename_collision_refused(_isolate_config: Path) -> None:
     _seed(_isolate_config)
-    result = CliRunner().invoke(app, ["rename", "stage", "prod"])
+    result = CliInvoker().invoke(app, ["rename", "stage", "prod"])
     assert result.exit_code != 0
 
 
@@ -636,20 +636,31 @@ def test_rename_collision_refused(_isolate_config: Path) -> None:
 
 
 def test_help_lists_all_commands() -> None:
-    result = CliRunner().invoke(app, ["--help"])
+    result = CliInvoker().invoke(app, ["--help"])
     assert result.exit_code == 0
     for cmd in ("list", "show", "use", "current", "create", "delete", "rename"):
         assert cmd in result.stdout
 
 
 def test_no_args_shows_help() -> None:
-    result = CliRunner().invoke(app, [])
-    assert result.exit_code == 2
+    result = CliInvoker().invoke(app, [])
+    assert result.exit_code == 0
     assert "Manage configuration profiles" in result.output or "Manage" in result.output
 
 
+def test_required_argument_commands_error_without_arguments() -> None:
+    runner = CliInvoker()
+
+    for args in (["use"], ["create"], ["delete"], ["rename"]):
+        result = runner.invoke(app, args)
+
+        assert result.exit_code == 2, result.output
+        assert result.stdout == ""
+        assert "requires an argument" in result.stderr
+
+
 def test_delete_help_lists_only_long_yes_option() -> None:
-    result = CliRunner().invoke(app, ["delete", "--help"])
+    result = CliInvoker().invoke(app, ["delete", "--help"])
 
     assert result.exit_code == 0
     assert "--yes" in result.output

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 
-from untaped import ConfigError
+from untaped.api import ConfigError
 
 from untaped_profile.application.ports import ProfileWriter
 

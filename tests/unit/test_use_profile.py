@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from untaped import ConfigError
+from untaped.api import ConfigError
 
 from untaped_profile.application import UseProfile
 

@@ -9,10 +9,10 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 from untaped import get_settings
 from untaped.main import build_app
 from untaped.plugins import PluginRegistry
+from untaped.testing import CliInvoker
 
 from untaped_profile.plugin import plugin as profile_plugin
 
@@ -39,13 +39,13 @@ def test_profile_plugin_entry_point_is_declared() -> None:
 
 
 def test_profile_plugin_declares_untaped_api_version() -> None:
-    assert profile_plugin.untaped_api_version == 1
+    assert profile_plugin.untaped_api_version == 2
 
 
 def test_root_app_can_register_profile_plugin() -> None:
     app = build_app(plugins=[profile_plugin])
 
-    result = CliRunner().invoke(app, ["profile", "--help"])
+    result = CliInvoker().invoke(app, ["profile", "--help"])
 
     assert result.exit_code == 0, result.output
     assert "Manage configuration profiles" in result.output
@@ -71,7 +71,7 @@ def test_root_profile_flag_flows_into_profile_current(_isolate_config: Path) -> 
     )
     app = build_app(plugins=[profile_plugin])
 
-    result = CliRunner().invoke(app, ["--profile", "stage", "profile", "current"])
+    result = CliInvoker().invoke(app, ["--profile", "stage", "profile", "current"])
 
     assert result.exit_code == 0, result.output
     assert result.stdout.splitlines() == ["stage"]
@@ -88,7 +88,7 @@ def test_command_local_profile_flag_flows_into_profile_current(_isolate_config: 
     )
     app = build_app(plugins=[profile_plugin])
 
-    result = CliRunner().invoke(app, ["profile", "current", "--profile", "stage"])
+    result = CliInvoker().invoke(app, ["profile", "current", "--profile", "stage"])
 
     assert result.exit_code == 0, result.output
     assert result.stdout.splitlines() == ["stage"]
@@ -105,7 +105,7 @@ def test_command_local_profile_flag_flows_into_profile_show(_isolate_config: Pat
     )
     app = build_app(plugins=[profile_plugin])
 
-    result = CliRunner().invoke(app, ["profile", "show", "--profile", "stage", "--format", "json"])
+    result = CliInvoker().invoke(app, ["profile", "show", "--profile", "stage", "--format", "json"])
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
@@ -124,7 +124,7 @@ def test_command_local_profile_flag_flows_into_profile_list(_isolate_config: Pat
     )
     app = build_app(plugins=[profile_plugin])
 
-    result = CliRunner().invoke(
+    result = CliInvoker().invoke(
         app,
         [
             "profile",
@@ -146,18 +146,7 @@ def test_command_local_profile_flag_flows_into_profile_list(_isolate_config: Pat
     assert rows["prod"] == ""
 
 
-@pytest.mark.parametrize(
-    "args",
-    [
-        ["profile", "use", "stage", "--profile", "prod"],
-        ["profile", "delete", "stage", "--profile", "prod"],
-        ["profile", "rename", "stage", "qa", "--profile", "prod"],
-    ],
-)
-def test_command_local_profile_flag_is_not_registered_on_mutations(
-    _isolate_config: Path,
-    args: list[str],
-) -> None:
+def test_root_profile_flag_is_available_on_profile_mutations(_isolate_config: Path) -> None:
     _isolate_config.write_text(
         "profiles:\n"
         "  default:\n    log_level: INFO\n"
@@ -167,7 +156,7 @@ def test_command_local_profile_flag_is_not_registered_on_mutations(
     )
     app = build_app(plugins=[profile_plugin])
 
-    result = CliRunner().invoke(app, args)
+    result = CliInvoker().invoke(app, ["profile", "use", "stage", "--profile", "prod"])
 
-    assert result.exit_code != 0
-    assert "No such option: --profile" in result.output
+    assert result.exit_code == 0, result.output
+    assert "active profile: stage" in result.output

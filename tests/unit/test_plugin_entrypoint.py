@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pytest
 from untaped import get_settings
+from untaped.api import CliSpec, PluginManifest, PluginRegistry
 from untaped.main import build_app
-from untaped.plugins import PluginRegistry
+from untaped.plugins import register_plugins
 from untaped.testing import CliInvoker
 
 from untaped_profile.plugin import plugin as profile_plugin
@@ -39,7 +40,24 @@ def test_profile_plugin_entry_point_is_declared() -> None:
 
 
 def test_profile_plugin_declares_untaped_api_version() -> None:
-    assert profile_plugin.untaped_api_version == 2
+    assert profile_plugin.untaped_api_version == 3
+
+
+def test_profile_plugin_manifest_shape() -> None:
+    manifest = profile_plugin.manifest()
+
+    assert isinstance(manifest, PluginManifest)
+    cli_spec = manifest.clis[0]
+    assert isinstance(cli_spec, CliSpec)
+    assert cli_spec.name == "profile"
+    assert cli_spec.app is None
+    assert cli_spec.import_path == "untaped_profile.cli:app"
+    assert cli_spec.help
+    assert [skill.name for skill in manifest.skills] == ["untaped-profile"]
+    assert not manifest.profile_settings
+    assert not manifest.state_settings
+    assert not manifest.themes
+    assert not manifest.diagnostics
 
 
 def test_root_app_can_register_profile_plugin() -> None:
@@ -54,11 +72,13 @@ def test_root_app_can_register_profile_plugin() -> None:
 def test_profile_plugin_registers_agent_skill() -> None:
     registry = PluginRegistry()
 
-    profile_plugin.register(registry)
+    register_plugins(registry, [profile_plugin])
 
+    assert registry.load_errors == []
     spec = registry.skills["untaped-profile"]
     assert spec.description == "Use the untaped profile plugin."
     assert spec.source.joinpath("SKILL.md").is_file()
+    assert "profile" in registry.lazy_clis
 
 
 def test_root_profile_flag_flows_into_profile_current(_isolate_config: Path) -> None:

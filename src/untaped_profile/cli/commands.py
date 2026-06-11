@@ -9,19 +9,21 @@ from typing import Annotated, Literal
 import yaml
 from cyclopts import Parameter
 from untaped import (
+    get_profile_settings_model,
+    redact_secrets,
+    resolve_config_path,
+    secret_field_paths,
+)
+from untaped.api import (
     ColumnsOption,
     ConfigError,
     FormatOption,
     ProfileOverrideOption,
     create_app,
     echo,
-    get_profile_settings_model,
     profile_override,
-    redact_secrets,
     render_rows,
     report_errors,
-    resolve_config_path,
-    secret_field_paths,
     ui_context,
 )
 

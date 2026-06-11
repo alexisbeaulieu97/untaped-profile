@@ -21,7 +21,13 @@ output helpers, and config-file primitives.
 3. **Expose the plugin through the `untaped.plugins` entry point.**
    `profile = "untaped_profile.plugin:plugin"` is the public integration
    point. The plugin object must expose `id = "profile"`, literal
-   `untaped_api_version = 2`, and `register(registry)`.
+   `untaped_api_version = 3`, and `manifest()` returning a
+   `PluginManifest`. The manifest declares the CLI lazily via
+   `CliSpec(name="profile", import_path="untaped_profile.cli:app", help=...)`
+   plus the packaged skill; `plugin.py` must never import the CLI module.
+   SDK names come from `untaped.api`; profile/config-file primitives stay on
+   `untaped.config_file`, and names not exported by `untaped.api` (e.g.
+   `DEFAULT_PROFILE`, `ProfileSource`, redaction helpers) stay on `untaped`.
 4. **Use the 4-layer DDD layout.** `cli -> application -> domain`, with
    `infrastructure -> domain`; `application` and `infrastructure` must not
    import each other at runtime.
@@ -51,8 +57,8 @@ output helpers, and config-file primitives.
 
 ```
 src/untaped_profile/
-├── __init__.py           # re-exports app
-├── plugin.py             # entry-point plugin object
+├── __init__.py           # lazy (PEP 562) re-export of app
+├── plugin.py             # entry-point plugin object (declarative manifest)
 ├── cli/                  # Cyclopts commands; composition root
 ├── application/          # use cases and ports
 ├── domain/               # pure models
@@ -64,8 +70,11 @@ Commands map one-to-one onto use cases in `application/`: `list`, `show`,
 `ProfileFileRepository` through the narrowest port in `application/ports.py`.
 The adapter delegates every read and write to `untaped.config_file` and
 `untaped.profile_resolver`; this package does not parse or write YAML itself.
-The plugin object also registers the packaged `untaped-profile` agent skill;
+The plugin manifest also declares the packaged `untaped-profile` agent skill;
 keep that static skill asset current with major profile workflow changes.
+`__init__.py` re-exports `app` through a module-level `__getattr__` so plugin
+discovery never eagerly imports the CLI stack; core imports
+`untaped_profile.cli:app` only when the `profile` command is dispatched.
 
 ## Active vs Persisted Active
 

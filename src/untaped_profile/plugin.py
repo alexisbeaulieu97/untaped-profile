@@ -5,23 +5,31 @@ from __future__ import annotations
 from importlib.resources import files
 from pathlib import Path
 
-from untaped.plugins import PluginRegistry, SkillSpec
-
-from untaped_profile import app
+from untaped.api import CliSpec, PluginManifest, SkillSpec
 
 
 class ProfilePlugin:
     id = "profile"
-    untaped_api_version = 2
+    untaped_api_version = 3
 
-    def register(self, registry: PluginRegistry) -> None:
-        registry.add_cli("profile", app)
-        registry.add_skill(
-            SkillSpec(
-                name="untaped-profile",
-                source=Path(str(files("untaped_profile").joinpath("skills", "untaped-profile"))),
-                description="Use the untaped profile plugin.",
-            )
+    def manifest(self) -> PluginManifest:
+        return PluginManifest(
+            clis=(
+                CliSpec(
+                    name="profile",
+                    import_path="untaped_profile.cli:app",
+                    help="Manage configuration profiles in ``~/.untaped/config.yml``.",
+                ),
+            ),
+            skills=(
+                SkillSpec(
+                    name="untaped-profile",
+                    source=Path(
+                        str(files("untaped_profile").joinpath("skills", "untaped-profile"))
+                    ),
+                    description="Use the untaped profile plugin.",
+                ),
+            ),
         )
 
 

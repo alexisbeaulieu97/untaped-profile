@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from untaped import DEFAULT_PROFILE
-
 from untaped_profile.application.ports import ProfileReader
 from untaped_profile.domain import Profile
+from untaped_profile.domain.resolver import DEFAULT_PROFILE
 
 
 class ListProfiles:

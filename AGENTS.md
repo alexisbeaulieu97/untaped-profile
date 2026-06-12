@@ -21,13 +21,20 @@ output helpers, and config-file primitives.
 3. **Expose the plugin through the `untaped.plugins` entry point.**
    `profile = "untaped_profile.plugin:plugin"` is the public integration
    point. The plugin object must expose `id = "profile"`, literal
-   `untaped_api_version = 3`, and `manifest()` returning a
+   `untaped_api_version = 4`, and `manifest()` returning a
    `PluginManifest`. The manifest declares the CLI lazily via
-   `CliSpec(name="profile", import_path="untaped_profile.cli:app", help=...)`
-   plus the packaged skill; `plugin.py` must never import the CLI module.
-   SDK names come from `untaped.api`; profile/config-file primitives stay on
-   `untaped.config_file`, and names not exported by `untaped.api` (e.g.
-   `DEFAULT_PROFILE`, `ProfileSource`, redaction helpers) stay on `untaped`.
+   `CliSpec(name="profile", import_path="untaped_profile.cli:app", help=...)`,
+   the packaged skill, the root `--profile` option
+   (`RootOptionSpec(handler_import_path="untaped_profile.root_option:apply")`),
+   and the settings layout
+   (`SettingsLayoutSpec(import_path="untaped_profile.layout:LAYOUT")`);
+   `plugin.py` must never import the CLI module. SDK names come from
+   `untaped.api`; config-file primitives (`read_config_dict`,
+   `mutate_config`) stay on `untaped.config_file`. Profile resolution
+   (`resolve_profiles`, `classify_active_profile`, `DEFAULT_PROFILE`,
+   `ProfileSource`) is owned by this plugin in
+   `untaped_profile.domain.resolver` — never import the deprecated core
+   copies.
 4. **Use the 4-layer DDD layout.** `cli -> application -> domain`, with
    `infrastructure -> domain`; `application` and `infrastructure` must not
    import each other at runtime.
@@ -87,15 +94,16 @@ discovery never eagerly imports the CLI stack; core imports
 - `persisted_active_name()` returns only the `active:` key on disk, ignoring
   per-call overrides.
 
-The `list`, `show`, and `current` commands expose the core command-local
-`ProfileOverrideOption` as `--profile` and wrap their reads in
-`profile_override(profile)`. Mutating commands do not expose a command-local
-profile selector. A transient profile override must never rewrite the user's
-persisted active pointer. Mutating use cases that consult the active pointer
-must compare against `persisted_active_name()`. `RenameProfile` delegates
-active-pointer consistency to `untaped.config_file.rename_profile`, which
-updates `active:` in the same locked mutation when the renamed profile was
-persisted active.
+Commands no longer declare their own `--profile` parameter: the root
+`--profile` option contributed by this plugin works in any token position
+(core consumes it before or, via strip-on-retry, after the command tokens)
+and applies through `untaped_profile.root_option.apply` before the command
+body reads anything. A transient profile override must never rewrite the
+user's persisted active pointer. Mutating use cases that consult the active
+pointer must compare against `persisted_active_name()`. `RenameProfile`
+delegates active-pointer consistency to
+`ProfileFileRepository.rename`, which updates `active:` in the same locked
+mutation when the renamed profile was persisted active.
 
 ## `current` Contract
 

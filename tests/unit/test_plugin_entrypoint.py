@@ -40,7 +40,7 @@ def test_profile_plugin_entry_point_is_declared() -> None:
 
 
 def test_profile_plugin_declares_untaped_api_version() -> None:
-    assert profile_plugin.untaped_api_version == 3
+    assert profile_plugin.untaped_api_version == 4
 
 
 def test_profile_plugin_manifest_shape() -> None:
@@ -54,6 +54,11 @@ def test_profile_plugin_manifest_shape() -> None:
     assert cli_spec.import_path == "untaped_profile.cli:app"
     assert cli_spec.help
     assert [skill.name for skill in manifest.skills] == ["untaped-profile"]
+    [root_option] = manifest.root_options
+    assert root_option.name == "--profile"
+    assert root_option.handler_import_path == "untaped_profile.root_option:apply"
+    assert manifest.settings_layout is not None
+    assert manifest.settings_layout.import_path == "untaped_profile.layout:LAYOUT"
     assert not manifest.profile_settings
     assert not manifest.state_settings
     assert not manifest.themes
@@ -98,7 +103,7 @@ def test_root_profile_flag_flows_into_profile_current(_isolate_config: Path) -> 
     assert "(source: env)" in result.stderr
 
 
-def test_command_local_profile_flag_flows_into_profile_current(_isolate_config: Path) -> None:
+def test_trailing_profile_flag_flows_into_profile_current(_isolate_config: Path) -> None:
     _isolate_config.write_text(
         "profiles:\n"
         "  default:\n    log_level: INFO\n"
@@ -115,7 +120,7 @@ def test_command_local_profile_flag_flows_into_profile_current(_isolate_config: 
     assert "(source: env)" in result.stderr
 
 
-def test_command_local_profile_flag_flows_into_profile_show(_isolate_config: Path) -> None:
+def test_trailing_profile_flag_flows_into_profile_show(_isolate_config: Path) -> None:
     _isolate_config.write_text(
         "profiles:\n"
         "  default:\n    log_level: INFO\n"
@@ -134,7 +139,7 @@ def test_command_local_profile_flag_flows_into_profile_show(_isolate_config: Pat
     assert payload["data"] == {"log_level": "DEBUG"}
 
 
-def test_command_local_profile_flag_flows_into_profile_list(_isolate_config: Path) -> None:
+def test_trailing_profile_flag_flows_into_profile_list(_isolate_config: Path) -> None:
     _isolate_config.write_text(
         "profiles:\n"
         "  default:\n    log_level: INFO\n"

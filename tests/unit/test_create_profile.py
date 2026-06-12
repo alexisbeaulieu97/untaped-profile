@@ -68,7 +68,7 @@ def test_accepts_profile_writer_without_active_pointer_surface() -> None:
     independent and a use case in one axis can't accidentally widen
     into the other.
     """
-    from untaped import ProfileSource
+    from untaped_profile.domain.resolver import ProfileSource
 
     class DataWriterOnly:
         def __init__(self) -> None:

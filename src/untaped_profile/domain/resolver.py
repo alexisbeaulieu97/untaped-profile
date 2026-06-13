@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 from typing import Any, Literal
 
-from untaped.errors import ConfigError
+from untaped.api import ConfigError
 
 ACTIVE_PROFILE_ENV = "UNTAPED_PROFILE"
 DEFAULT_PROFILE = "default"

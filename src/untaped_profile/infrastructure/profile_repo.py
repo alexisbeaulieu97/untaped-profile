@@ -20,14 +20,17 @@ from untaped_profile.domain.resolver import (
 )
 
 
+def _profiles(config: dict[str, Any]) -> dict[str, Any]:
+    """Return the ``profiles`` mapping from a config dict, or empty if absent/malformed."""
+    profiles = config.get("profiles")
+    return profiles if isinstance(profiles, dict) else {}
+
+
 class ProfileFileRepository:
     """Concrete adapter over ``~/.untaped/config.yml``."""
 
     def names(self) -> list[str]:
-        profiles = read_config_dict().get("profiles") or {}
-        if not isinstance(profiles, dict):
-            return []
-        return list(profiles.keys())
+        return list(_profiles(read_config_dict()).keys())
 
     def active_name(self) -> str | None:
         """Return the effective active profile, honouring ``UNTAPED_PROFILE``.
@@ -58,10 +61,7 @@ class ProfileFileRepository:
         return classify_active_profile(read_config_dict())
 
     def read(self, name: str) -> dict[str, Any] | None:
-        profiles = read_config_dict().get("profiles") or {}
-        if not isinstance(profiles, dict):
-            return None
-        profile = profiles.get(name)
+        profile = _profiles(read_config_dict()).get(name)
         return profile if isinstance(profile, dict) else None
 
     def resolved(self, name: str) -> dict[str, Any]:
@@ -84,8 +84,8 @@ class ProfileFileRepository:
 
         def _apply(config: dict[str, Any]) -> None:
             nonlocal removed
-            profiles = config.get("profiles")
-            if not isinstance(profiles, dict) or name not in profiles:
+            profiles = _profiles(config)
+            if name not in profiles:
                 return
             del profiles[name]
             removed = True
@@ -102,8 +102,8 @@ class ProfileFileRepository:
         """
 
         def _apply(config: dict[str, Any]) -> None:
-            profiles = config.get("profiles")
-            if not isinstance(profiles, dict) or old not in profiles:
+            profiles = _profiles(config)
+            if old not in profiles:
                 raise KeyError(f"profile {old!r} does not exist")
             if new in profiles:
                 raise ValueError(f"profile {new!r} already exists")

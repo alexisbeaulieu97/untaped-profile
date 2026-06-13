@@ -25,13 +25,19 @@ class ProfilesSettingsLayout:
     supports_scopes = True
 
     def effective(self, raw: dict[str, Any], *, scope: str | None = None) -> dict[str, Any]:
-        override = scope or effective_active_profile_name(raw)
-        effective, _ = resolve_profiles(raw, active_override=override)
+        effective, _ = self._resolve(raw, scope)
         return effective
 
     def provenance(self, raw: dict[str, Any]) -> dict[tuple[str, ...], str]:
-        _, provenance = resolve_profiles(raw, active_override=effective_active_profile_name(raw))
+        _, provenance = self._resolve(raw)
         return provenance
+
+    def _resolve(
+        self, raw: dict[str, Any], scope: str | None = None
+    ) -> tuple[dict[str, Any], dict[tuple[str, ...], str]]:
+        """Resolve effective settings + provenance for the active (or given) scope."""
+        override = scope or effective_active_profile_name(raw)
+        return resolve_profiles(raw, active_override=override)
 
     def scope_names(self, raw: dict[str, Any]) -> list[str]:
         profiles = raw.get("profiles")

@@ -9,13 +9,16 @@ workflow, update this file in the same commit.
 `untaped-profile` is an `untaped` plugin. It owns the **profile inventory**
 in `~/.untaped/config.yml`: which profiles exist, which profile is active,
 and how profiles are created, shown, selected, deleted, and renamed.
-`untaped` core owns the binary, plugin discovery, config/profile resolution,
-output helpers, and config-file primitives.
+`untaped` core owns the binary, plugin discovery, config-file primitives,
+root-option dispatch, and output helpers. This plugin contributes profile
+selection and the profiles settings layout.
 
 ## Hard Rules
 
-1. **Keep `AGENTS.md` up to date.** Architecture changes and new command
-   patterns must be documented here.
+1. **Keep `AGENTS.md` and the packaged skill up to date.** Architecture
+   changes, new command patterns, settings-layout changes, and major profile
+   workflow changes must be documented here and in
+   `src/untaped_profile/skills/untaped-profile/SKILL.md`.
 2. **Prefer `uv` commands over manual dependency edits.** Use `uv add` and
    `uv add --group dev`; hand-edit tool config only.
 3. **Expose the plugin through the `untaped.plugins` entry point.**
@@ -108,9 +111,9 @@ mutation when the renamed profile was persisted active.
 ## `current` Contract
 
 `untaped profile current` returns `(name, source)`, where source is `env`,
-`config`, or `fallback`. A command-local `--profile <name>` is implemented
-through the same temporary env override as the root flag, so it reports
-`env`. The name goes to stdout; `(source: ...)` goes to stderr.
+`config`, or `fallback`. The root `--profile <name>` option is implemented
+through a temporary env override, so it reports `env` regardless of token
+position. The name goes to stdout; `(source: ...)` goes to stderr.
 
 When source is `env` or `config`, the use case validates that the named
 profile exists. This protects the pipe pattern:

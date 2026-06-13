@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from untaped import DEFAULT_PROFILE
 from untaped.api import ConfigError
 
 from untaped_profile.application.ports import ProfileWriter
+from untaped_profile.domain.resolver import DEFAULT_PROFILE
 
 
 class RenameProfile:

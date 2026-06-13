@@ -1,45 +1,44 @@
 """YAML-backed adapter for profile reader and writer ports.
 
 This is the only profile module that knows about the on-disk layout — the
-use cases stay portable. Every method delegates to ``untaped``'s
-profile-aware helpers in ``config_file`` and ``profile_resolver``.
+use cases stay portable. It builds on core's public config primitives
+(``read_config_dict`` / ``mutate_config``); the profile-shaped editing
+lives here, not in core.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from untaped import (
+from untaped.config_file import mutate_config, read_config_dict
+
+from untaped_profile.domain.resolver import (
     ProfileSource,
     classify_active_profile,
     effective_active_profile_name,
     resolve_profiles,
 )
-from untaped.config_file import (
-    delete_profile,
-    get_active_profile_name,
-    list_profile_names,
-    read_config_dict,
-    read_profile,
-    rename_profile,
-    set_active_profile,
-    write_profile,
-)
+
+
+def _profiles(config: dict[str, Any]) -> dict[str, Any]:
+    """Return the ``profiles`` mapping from a config dict, or empty if absent/malformed."""
+    profiles = config.get("profiles")
+    return profiles if isinstance(profiles, dict) else {}
 
 
 class ProfileFileRepository:
     """Concrete adapter over ``~/.untaped/config.yml``."""
 
     def names(self) -> list[str]:
-        return list_profile_names()
+        return list(_profiles(read_config_dict()).keys())
 
     def active_name(self) -> str | None:
         """Return the effective active profile, honouring ``UNTAPED_PROFILE``.
 
         The env override mirrors what every other consumer of "active
-        profile" sees (``untaped config list``, the resolver inside
-        :class:`ProfilesSettingsSource`, etc.), so the ``profile list`` ✓
-        marker stays consistent with reality during a per-call override.
+        profile" sees (``untaped config list``, the settings layout this
+        plugin contributes, etc.), so the ``profile list`` ✓ marker stays
+        consistent with reality during a per-call override.
         """
         return effective_active_profile_name(read_config_dict())
 
@@ -47,22 +46,23 @@ class ProfileFileRepository:
         """Return ``active:`` from disk, ignoring per-call overrides.
 
         Mutating use cases (delete, rename) compare against this so a
-        transient ``--profile`` flag never rewrites the user's persisted
+        transient ``--profile`` option never rewrites the user's persisted
         active pointer behind their back.
         """
-        return get_active_profile_name()
+        name = read_config_dict().get("active")
+        return name if isinstance(name, str) and name else None
 
     def classify_active(self) -> tuple[str | None, ProfileSource]:
         """Return the effective active profile name + the layer that supplied it.
 
-        Delegates to :func:`untaped.classify_active_profile`, which
-        is the single source of truth for the env/active/fallback
-        precedence.
+        Delegates to the domain resolver, which is the single source of
+        truth for the env/active/fallback precedence.
         """
         return classify_active_profile(read_config_dict())
 
     def read(self, name: str) -> dict[str, Any] | None:
-        return read_profile(name)
+        profile = _profiles(read_config_dict()).get(name)
+        return profile if isinstance(profile, dict) else None
 
     def resolved(self, name: str) -> dict[str, Any]:
         """Return ``default`` ⤥ ``name`` as a merged dict (empty if neither set)."""
@@ -70,13 +70,51 @@ class ProfileFileRepository:
         return effective
 
     def write(self, name: str, data: dict[str, Any]) -> None:
-        write_profile(name, data)
+        def _apply(config: dict[str, Any]) -> None:
+            profiles = config.get("profiles")
+            if not isinstance(profiles, dict):
+                profiles = {}
+                config["profiles"] = profiles
+            profiles[name] = data
+
+        mutate_config(_apply)
 
     def delete(self, name: str) -> bool:
-        return delete_profile(name)
+        removed = False
+
+        def _apply(config: dict[str, Any]) -> None:
+            nonlocal removed
+            profiles = _profiles(config)
+            if name not in profiles:
+                return
+            del profiles[name]
+            removed = True
+
+        mutate_config(_apply)
+        return removed
 
     def rename(self, old: str, new: str) -> None:
-        rename_profile(old, new)
+        """Rename ``profiles.<old>`` to ``profiles.<new>`` in one transaction.
+
+        Also updates ``active:`` if it pointed at ``old``. Raises
+        ``KeyError`` if ``old`` is missing or ``ValueError`` if ``new``
+        already exists, both *before* any mutation is written.
+        """
+
+        def _apply(config: dict[str, Any]) -> None:
+            profiles = _profiles(config)
+            if old not in profiles:
+                raise KeyError(f"profile {old!r} does not exist")
+            if new in profiles:
+                raise ValueError(f"profile {new!r} already exists")
+            profiles[new] = profiles.pop(old)
+            if config.get("active") == old:
+                config["active"] = new
+
+        mutate_config(_apply)
 
     def set_active(self, name: str) -> None:
-        set_active_profile(name)
+        def _apply(config: dict[str, Any]) -> None:
+            config["active"] = name
+
+        mutate_config(_apply)

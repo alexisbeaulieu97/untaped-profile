@@ -18,10 +18,8 @@ from untaped.api import (
     ColumnsOption,
     ConfigError,
     FormatOption,
-    ProfileOverrideOption,
     create_app,
     echo,
-    profile_override,
     render_rows,
     report_errors,
     ui_context,
@@ -55,10 +53,9 @@ def list_command(
     *,
     fmt: FormatOption = "table",
     columns: ColumnsOption = None,
-    profile: ProfileOverrideOption = None,
 ) -> None:
     """List every profile, marking which one is active."""
-    with report_errors(), profile_override(profile):
+    with report_errors():
         profiles = ListProfiles(ProfileFileRepository())()
         rows: list[dict[str, object]] = [_profile_row(p) for p in profiles]
         echo(render_rows(rows, fmt=fmt, columns=columns))
@@ -87,7 +84,6 @@ def show_command(
         ShowFormat,
         Parameter(name=["--format", "-f"], help="Output format (yaml or json)."),
     ] = "yaml",
-    profile: ProfileOverrideOption = None,
 ) -> None:
     """Print a profile's contents (effective view by default).
 
@@ -100,7 +96,7 @@ def show_command(
     Secrets (AWX/GitHub tokens) are masked as ``***`` in both formats
     unless ``--show-secrets`` is passed, mirroring ``untaped config list``.
     """
-    with report_errors(), profile_override(profile):
+    with report_errors():
         repo = ProfileFileRepository()
         if name is None:
             current = CurrentProfile(repo)()
@@ -151,19 +147,15 @@ def use_command(
 
 
 @app.command(name="current")
-def current_command(
-    *,
-    profile: ProfileOverrideOption = None,
-) -> None:
+def current_command() -> None:
     """Print the effective active profile name to stdout (pipe-friendly).
 
-    Honours ``UNTAPED_PROFILE``, the root ``--profile`` flag, and this
-    command's local ``--profile`` flag, falling back to ``default`` when
-    none is set. The source of the answer (``env`` / ``config`` /
-    ``fallback``) goes to stderr so stdout stays a single bare profile
-    name suitable for piping.
+    Honours ``UNTAPED_PROFILE`` and the root ``--profile`` option (any
+    token position), falling back to ``default`` when none is set. The
+    source of the answer (``env`` / ``config`` / ``fallback``) goes to
+    stderr so stdout stays a single bare profile name suitable for piping.
     """
-    with report_errors(), profile_override(profile):
+    with report_errors():
         result = CurrentProfile(ProfileFileRepository())()
         echo(result.name)
         echo(f"(source: {result.source})", err=True)

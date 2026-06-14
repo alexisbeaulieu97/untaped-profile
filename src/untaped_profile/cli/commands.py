@@ -58,7 +58,14 @@ def list_command(
     with report_errors():
         profiles = ListProfiles(ProfileFileRepository())()
         rows: list[dict[str, object]] = [_profile_row(p) for p in profiles]
-        echo(render_rows(rows, fmt=fmt, columns=columns))
+        rendered = render_rows(
+            rows,
+            fmt=fmt,
+            columns=columns,
+            empty="No profiles configured. Create one with `untaped profile create <name>`.",
+        )
+        if rendered:
+            echo(rendered)
 
 
 @app.command(name="show")

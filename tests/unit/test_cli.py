@@ -72,6 +72,22 @@ def test_list_marks_active_profile(_isolate_config: Path) -> None:
     assert rows["default"] == ""
 
 
+def test_list_empty_guides_with_stderr_hint(_isolate_config: Path) -> None:
+    # No profiles configured (config not seeded) → guiding hint on stderr,
+    # stdout stays clean.
+    result = CliInvoker().invoke(app, ["list"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout == ""
+    assert "No profiles configured" in result.stderr
+
+
+def test_list_empty_json_stays_pipe_clean(_isolate_config: Path) -> None:
+    result = CliInvoker().invoke(app, ["list", "--format", "json"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == "[]"
+    assert "No profiles configured" not in result.stderr
+
+
 def test_list_table_honours_global_ui_collection_view(_isolate_config: Path) -> None:
     _isolate_config.write_text(
         "ui:\n"

@@ -40,7 +40,7 @@ def test_profile_plugin_entry_point_is_declared() -> None:
 
 
 def test_profile_plugin_declares_untaped_api_version() -> None:
-    assert profile_plugin.untaped_api_version == 4
+    assert profile_plugin.untaped_api_version == 5
 
 
 def test_profile_plugin_manifest_shape() -> None:

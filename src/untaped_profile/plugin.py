@@ -21,7 +21,7 @@ PROFILE_OPTION_HELP = (
 
 class ProfilePlugin:
     id = "profile"
-    untaped_api_version = 4
+    untaped_api_version = 5
 
     def manifest(self) -> PluginManifest:
         return PluginManifest(

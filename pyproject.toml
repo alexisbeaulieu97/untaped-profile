@@ -1,6 +1,6 @@
 [project]
 name = "untaped-profile"
-version = "0.2.0"
+version = "0.3.0"
 description = "Profile management plugin for untaped."
 authors = [
     { name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }
@@ -9,7 +9,7 @@ requires-python = ">=3.14"
 dependencies = [
     "cyclopts>=4.16.0,<5",
     "pyyaml>=6.0.3",
-    "untaped>=0.4.0",
+    "untaped>=0.5.0",
 ]
 
 [project.entry-points."untaped.plugins"]
